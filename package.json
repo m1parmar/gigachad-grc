@@ -1,0 +1,36 @@
+{
+  "name": "gigachad-grc",
+  "private": true,
+  "workspaces": [
+    "services/shared",
+    "services/controls",
+    "services/frameworks",
+    "services/policies",
+    "services/tprm",
+    "services/trust",
+    "services/audit",
+    "frontend"
+  ],
+  "scripts": {
+    "validate:production": "./scripts/validate-production.sh",
+    "validate:production:strict": "./scripts/validate-production.sh --strict",
+    "backup": "./deploy/backup.sh",
+    "restore": "./deploy/restore.sh",
+    "ci:build:frontend": "npm --workspace frontend run build:typecheck",
+    "ci:analyze:frontend": "npm --workspace frontend run build:analyze",
+    "test:load": "./tests/load/run-load-tests.sh",
+    "test:load:smoke": "./tests/load/run-load-tests.sh smoke",
+    "test:load:load": "./tests/load/run-load-tests.sh load",
+    "test:load:stress": "./tests/load/run-load-tests.sh stress",
+    "test:load:spike": "./tests/load/run-load-tests.sh spike",
+    "test:load:soak": "./tests/load/run-load-tests.sh soak",
+    "test:load:all": "./tests/load/run-load-tests.sh all",
+    "test:load:quick": "./tests/load/run-load-tests.sh quick"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
+  }
+}

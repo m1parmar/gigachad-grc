@@ -1,0 +1,456 @@
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+import { visualizer } from 'rollup-plugin-visualizer';
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+
+  // Prevent accidental shipping of dev-only auth flags in production builds
+  if (mode === 'production' && env.VITE_ENABLE_DEV_AUTH === 'true') {
+    throw new Error(
+      'VITE_ENABLE_DEV_AUTH must be false or unset for production builds. ' +
+      'Disable dev auth in your production env before building.'
+    );
+  }
+
+  const isAnalyze = process.env.ANALYZE === 'true';
+
+  return {
+  plugins: [
+    react(),
+    // Bundle analysis – only enabled when ANALYZE=true
+    isAnalyze &&
+      visualizer({
+        filename: 'dist/bundle-stats.html',
+        template: 'treemap',
+        gzipSize: true,
+        brotliSize: true,
+        open: false,
+      }),
+  ].filter(Boolean),
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          // Vendor chunks - split large dependencies for optimal caching
+          if (id.includes('node_modules')) {
+            // Core React dependencies - rarely changes
+            if (id.includes('react-dom')) {
+              return 'vendor-react-dom';
+            }
+            if (id.includes('react-router')) {
+              return 'vendor-react-router';
+            }
+            if (id.includes('react') && !id.includes('react-')) {
+              return 'vendor-react-core';
+            }
+            
+            // Query/State management
+            if (id.includes('@tanstack/react-query')) {
+              return 'vendor-react-query';
+            }
+            
+            // Charts and visualization - large, load on demand
+            if (id.includes('recharts')) {
+              return 'vendor-charts-recharts';
+            }
+            if (id.includes('d3')) {
+              return 'vendor-charts-d3';
+            }
+            
+            // UI components
+            if (id.includes('@headlessui')) {
+              return 'vendor-ui-headless';
+            }
+            if (id.includes('@heroicons')) {
+              return 'vendor-ui-icons';
+            }
+            if (id.includes('lucide')) {
+              return 'vendor-ui-lucide';
+            }
+            
+            // Form handling
+            if (id.includes('react-hook-form') || id.includes('@hookform')) {
+              return 'vendor-forms';
+            }
+            if (id.includes('zod')) {
+              return 'vendor-zod';
+            }
+            
+            // Date utilities
+            if (id.includes('date-fns')) {
+              return 'vendor-date';
+            }
+            
+            // Excel/file handling - only load when needed
+            if (id.includes('xlsx')) {
+              return 'vendor-xlsx';
+            }
+            if (id.includes('mammoth')) {
+              return 'vendor-docx';
+            }
+            
+            // Internationalization
+            if (id.includes('i18next')) {
+              return 'vendor-i18n';
+            }
+            
+            // Monaco editor (code editing) - very large
+            if (id.includes('monaco')) {
+              return 'vendor-monaco';
+            }
+            
+            // Grid layout
+            if (id.includes('react-grid-layout')) {
+              return 'vendor-grid';
+            }
+            
+            // Authentication
+            if (id.includes('@okta')) {
+              return 'vendor-auth-okta';
+            }
+            if (id.includes('keycloak')) {
+              return 'vendor-auth-keycloak';
+            }
+            
+            // Error tracking
+            if (id.includes('@sentry')) {
+              return 'vendor-sentry';
+            }
+            
+            // Markdown rendering
+            if (id.includes('react-markdown') || id.includes('remark') || id.includes('rehype')) {
+              return 'vendor-markdown';
+            }
+            
+            // HTTP clients
+            if (id.includes('axios')) {
+              return 'vendor-http';
+            }
+            
+            // Utilities (clsx, etc.)
+            if (id.includes('clsx') || id.includes('class-variance-authority') || id.includes('tailwind-merge')) {
+              return 'vendor-css-utils';
+            }
+            
+            // Toast notifications
+            if (id.includes('react-hot-toast') || id.includes('sonner')) {
+              return 'vendor-toast';
+            }
+            
+            // Everything else in node_modules
+            return 'vendor-misc';
+          }
+        },
+      },
+    },
+    // Increase chunk size warning limit
+    chunkSizeWarningLimit: 500, // Warn at 500KB
+    // Enable source maps for production debugging (disable for smaller builds)
+    sourcemap: process.env.NODE_ENV !== 'production',
+    // Optimize CSS
+    cssCodeSplit: true,
+    // Minification options
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.logs in production
+        drop_debugger: true,
+        // Additional optimizations
+        pure_funcs: ['console.log', 'console.info', 'console.debug'],
+      },
+      mangle: {
+        safari10: true, // Safari 10 compatibility
+      },
+    },
+    // Target modern browsers for smaller bundles
+    target: 'es2020',
+  },
+  // Optimize deps for faster dev startup
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      '@tanstack/react-query',
+      '@tanstack/react-virtual',
+      'axios',
+      'clsx',
+      'date-fns',
+      'react-hot-toast',
+    ],
+    exclude: [
+      // Exclude large libraries that are dynamically imported
+      'xlsx',
+      'mammoth',
+      '@monaco-editor/react',
+    ],
+  },
+  // Enable preview to test production builds locally
+  preview: {
+    port: 4173,
+    strictPort: true,
+    headers: {
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'X-XSS-Protection': '1; mode=block',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+    },
+  },
+  // Improve caching
+  cacheDir: 'node_modules/.vite',
+  server: {
+    port: 3000,
+    proxy: {
+      // Controls service (controls, evidence, implementations, dashboard)
+      '/api/controls': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/evidence': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/implementations': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/dashboard': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/dashboards': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/comments': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/tasks': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/integrations': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/notifications': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/users': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/permissions': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/risks': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/assets': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/risk-config': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/risk-scenarios': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/seed': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/employee-compliance': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/notifications-config': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/training': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/ai': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/mcp': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/system': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/bulk': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/modules': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/config-as-code': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/workspaces': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      // Framework catalog (controls service)
+      '/api/frameworks/catalog': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      // Frameworks service (frameworks, assessments, mappings)
+      '/api/frameworks': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+      },
+      '/api/assessments': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+      },
+      '/api/mappings': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+      },
+      // Policies service
+      '/api/policies': {
+        target: 'http://localhost:3004',
+        changeOrigin: true,
+      },
+      // TPRM service (vendors, contracts, assessments, config)
+      '/api/vendors': {
+        target: 'http://localhost:3005',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      '/api/contracts': {
+        target: 'http://localhost:3005',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      '/api/vendor-assessments': {
+        target: 'http://localhost:3005',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/vendor-assessments/, '/assessments'),
+      },
+      '/api/tprm-config': {
+        target: 'http://localhost:3005',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      // Trust service (questionnaires, knowledge base, trust center)
+      '/api/questionnaires': {
+        target: 'http://localhost:3006',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      '/api/knowledge-base': {
+        target: 'http://localhost:3006',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      '/api/trust-center': {
+        target: 'http://localhost:3006',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      '/api/trust-config': {
+        target: 'http://localhost:3006',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      '/api/answer-templates': {
+        target: 'http://localhost:3006',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      '/api/trust-ai': {
+        target: 'http://localhost:3006',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      // Audit service (audits, audit requests)
+      '/api/audits': {
+        target: 'http://localhost:3007',
+        changeOrigin: true,
+      },
+      '/api/audit-requests': {
+        target: 'http://localhost:3007',
+        changeOrigin: true,
+      },
+      '/api/findings': {
+        target: 'http://localhost:3007',
+        changeOrigin: true,
+      },
+      // Audit module routes (templates, workpapers, test procedures, etc.)
+      '/api/audit/templates': {
+        target: 'http://localhost:3007',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/audit/templates', '/templates'),
+      },
+      '/api/audit/workpapers': {
+        target: 'http://localhost:3007',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/audit/workpapers', '/workpapers'),
+      },
+      '/api/audit/test-procedures': {
+        target: 'http://localhost:3007',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/audit/test-procedures', '/test-procedures'),
+      },
+      '/api/audit/remediation': {
+        target: 'http://localhost:3007',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/audit/remediation', '/remediation'),
+      },
+      '/api/audit/analytics': {
+        target: 'http://localhost:3007',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/audit/analytics', '/analytics'),
+      },
+      '/api/audit/planning': {
+        target: 'http://localhost:3007',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/audit/planning', '/planning'),
+      },
+      '/api/audit/reports': {
+        target: 'http://localhost:3007',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/audit/reports', '/reports'),
+      },
+      '/api/audit/audit-ai': {
+        target: 'http://localhost:3007',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/audit/audit-ai', '/audit-ai'),
+      },
+      // Audit log/trail (controls service) - MUST be after /api/audits and other audit routes
+      '/api/audit': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+    },
+  },
+};
+});
+

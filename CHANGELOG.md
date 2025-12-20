@@ -1,0 +1,170 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning where practical.
+
+## [1.0.0] - 2024-12-15
+
+### Added
+
+#### Trust Module Enhancements
+- **Answer Templates**: Reusable response templates for common questionnaire questions
+  - Template categories for organization
+  - Variable substitution support (e.g., `{{company_name}}`, `{{date}}`)
+  - Usage tracking and analytics
+  - Import/export functionality
+- **AI-Powered Features**: Smart questionnaire assistance
+  - AI answer drafting using Knowledge Base context
+  - Automatic question categorization
+  - Answer improvement suggestions
+  - Confidence scoring for AI suggestions
+- **Similar Question Detection**: Find and reuse previous answers
+  - Cross-questionnaire similarity search
+  - Duplicate detection within questionnaires
+  - One-click answer reuse
+- **Trust Analytics**: Comprehensive performance insights
+  - Questionnaire completion metrics
+  - SLA compliance tracking
+  - Team performance analysis
+  - Category breakdown and trends
+- **Trust Configuration**: Centralized settings management
+  - SLA configuration by priority level
+  - Auto-assignment rules
+  - AI provider configuration
+  - Knowledge Base behavior settings
+- **Questionnaire Export**: Multiple export formats
+  - Excel, CSV, JSON, PDF formats
+  - Customizable export templates
+  - Bulk export support
+- **Trust Analyst Queue Widget**: Dashboard integration
+  - Assigned questions at a glance
+  - Overdue item highlighting
+  - Due this week preview
+- **Knowledge Base Improvements**: Enhanced search and relevance
+  - Improved relevance scoring algorithm
+  - Better tokenization and matching
+
+#### Audit Module Enhancements
+- **Audit Templates**: Reusable audit program templates
+  - Pre-built system templates for SOC 2, ISO 27001, HIPAA, PCI-DSS
+  - Custom template creation with checklists and request templates
+  - One-click audit creation from templates
+  - Template cloning and management
+- **Workpaper Management**: Formal audit documentation
+  - Multi-level review workflow (Draft → Pending Review → Reviewed → Approved)
+  - Version control with full history tracking
+  - Cross-references to controls, findings, and evidence
+  - Digital signature support
+- **Test Procedures**: Structured control testing
+  - Support for inquiry, observation, inspection, and reperformance
+  - Configurable sampling (size, method, population)
+  - Effectiveness conclusions with rationale
+  - Review process with notes
+- **Remediation Plans (POA&M)**: Enhanced finding remediation
+  - Milestone-based remediation tracking
+  - Resource assignment and effort tracking
+  - Priority-based scheduling
+  - POA&M export in JSON and CSV formats
+- **Audit Analytics**: Comprehensive reporting
+  - Real-time dashboard with key metrics
+  - Trend analysis (monthly, quarterly, yearly)
+  - Finding analytics by severity, category, status
+  - Control testing coverage metrics
+- **Audit Calendar**: Multi-year planning
+  - Visual calendar view by year and quarter
+  - Risk-based audit prioritization
+  - Capacity analysis and resource planning
+  - Convert plan entries to active audits
+- **AI-Powered Audit Features**: Intelligent assistance
+  - Finding categorization (severity, domain, framework)
+  - Evidence gap analysis
+  - AI-generated remediation suggestions
+  - Control mapping recommendations
+  - Audit summary generation
+- **Recurring Evidence Requests**: Automated collection
+  - Configurable recurrence patterns
+  - Evidence freshness tracking
+  - Auto-flagging of stale evidence
+- **Report Generation**: Multiple report types
+  - Executive summary
+  - Management letter
+  - Findings summary
+  - Full audit report with all sections
+
+#### TPRM Module Enhancements
+- **TPRM Configuration**: Dedicated settings page
+  - Tier-to-frequency mapping customization
+  - Custom review frequencies (e.g., "2 months")
+  - Vendor category management
+  - Assessment and contract settings
+- **Tier-Based Review Automation**: Automatic scheduling
+  - Vendor reviews scheduled by tier
+  - Configurable frequency per tier
+  - Dashboard widget for upcoming reviews
+- **AI-Assisted SOC 2 Analysis**: Document analysis
+  - PDF/document upload for vendor assessments
+  - AI-extracted findings and exceptions
+  - Suggested risk scores
+
+#### Community & Infrastructure
+- GitHub issue templates (bug report, feature request, security vulnerability)
+- Pull request template with comprehensive checklist
+- Security audit documentation (`docs/SECURITY_AUDIT.md`)
+- QA testing checklist (`docs/QA_TESTING_CHECKLIST.md`)
+- GitHub FUNDING.yml for sponsorship configuration
+- CI/CD workflow with GitHub Actions (lint, test, build, Docker, security scan)
+- Demo environment scripts (`scripts/start-demo.sh`, `scripts/stop-demo.sh`)
+- Gitpod and GitHub Codespaces configuration for cloud development
+- Comprehensive demo documentation (`docs/DEMO.md`)
+
+### Changed
+- Updated README with contribution badges and improved support section
+- Enhanced CONTRIBUTING.md with clear guidelines
+- Replaced `xlsx` library with `exceljs` for Excel import/export (more actively maintained)
+- Improved dashboard Risk Heatmap visibility and layout
+- MCP client service now starts servers asynchronously (non-blocking)
+
+### Fixed
+- Controls service MCP server startup no longer blocks application bootstrap
+- Pagination pipes instantiation in controllers
+
+### Security
+- **Fixed all high severity vulnerabilities** (reduced from 3 to 0)
+- Upgraded `@nestjs/cli` from v10.x to v11.x across all services (fixes glob CLI command injection - CVE-related)
+- Replaced `xlsx` (SheetJS) with `exceljs` (fixes prototype pollution CVE-2024-22363 and ReDoS vulnerabilities)
+- **Removed hardcoded encryption key fallback** - ENCRYPTION_KEY env var now required
+- **Added XSS protection** for Word document preview using DOMPurify sanitization
+- Added comprehensive security deep dive audit (`docs/SECURITY_DEEP_DIVE_AUDIT.md`)
+- Updated security audit documentation with current vulnerability status
+
+## [1.0.0-beta] - 2024-12-13
+
+### Added
+
+- Microservice-based GRC platform including Controls, Frameworks, Policies, Risk, TPRM, Trust, Audit, and BCDR modules
+- Configuration-as-Code (Terraform export/import) and state tracking for drift/conflict awareness
+- Performance optimizations (dashboard consolidation, caching, reduced DB query counts)
+- AI Assistant framework with support for OpenAI/Anthropic providers
+- **Mock AI provider** to enable AI feature testing without an API key
+- Backup/restore tooling and production compose resilience defaults
+
+### Changed
+
+- Improved dashboard loading by consolidating multiple API calls into a single endpoint
+- Added pagination guards and maximum limits on list endpoints to prevent unbounded queries
+
+### Fixed
+
+- Framework seeding consistency (ensures demo frameworks are fully viewable/activated)
+- Multiple Config-as-Code state endpoint and schema issues
+
+---
+
+## Notes
+
+- Dates are in YYYY-MM-DD format.
+- "Unreleased" changes should be moved into a versioned section when publishing a release.
+
+
+

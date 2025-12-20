@@ -1,0 +1,284 @@
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
+import { Request, Response } from 'express';
+
+/**
+ * Patterns to sanitize from error messages
+ */
+const SENSITIVE_PATTERNS = [
+  // Database connection strings
+  /postgresql:\/\/[^@]+@[^\s]+/gi,
+  /mysql:\/\/[^@]+@[^\s]+/gi,
+  /mongodb(\+srv)?:\/\/[^@]+@[^\s]+/gi,
+  /redis:\/\/[^@]+@[^\s]+/gi,
+  
+  // File paths
+  /\/Users\/[^\s:]+/gi,
+  /\/home\/[^\s:]+/gi,
+  /C:\\Users\\[^\s:]+/gi,
+  /\/app\/[^\s:]+/gi,
+  /\/var\/[^\s:]+/gi,
+  
+  // IP addresses (internal)
+  /\b10\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g,
+  /\b172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}\b/g,
+  /\b192\.168\.\d{1,3}\.\d{1,3}\b/g,
+  
+  // API keys and tokens
+  /api[_-]?key[=:]\s*["']?[a-zA-Z0-9_-]+["']?/gi,
+  /bearer\s+[a-zA-Z0-9_.-]+/gi,
+  /token[=:]\s*["']?[a-zA-Z0-9_.-]+["']?/gi,
+  
+  // Environment variable values
+  /process\.env\.[A-Z_]+\s*=\s*["'][^"']+["']/gi,
+];
+
+/**
+ * Generic error messages for production
+ */
+const GENERIC_MESSAGES: Record<number, string> = {
+  400: 'Invalid request. Please check your input.',
+  401: 'Authentication required. Please log in.',
+  403: 'You do not have permission to perform this action.',
+  404: 'The requested resource was not found.',
+  405: 'This action is not allowed.',
+  409: 'A conflict occurred. Please try again.',
+  422: 'The request could not be processed. Please check your input.',
+  429: 'Too many requests. Please slow down.',
+  500: 'An unexpected error occurred. Please try again later.',
+  502: 'Service temporarily unavailable. Please try again later.',
+  503: 'Service temporarily unavailable. Please try again later.',
+  504: 'The request took too long. Please try again.',
+};
+
+/**
+ * Error response structure
+ */
+interface ErrorResponse {
+  statusCode: number;
+  message: string;
+  error: string;
+  timestamp: string;
+  path: string;
+  // Only included in development
+  details?: string;
+  stack?: string;
+}
+
+/**
+ * Global exception filter that sanitizes error messages in production
+ * 
+ * Features:
+ * - Removes sensitive information (paths, connection strings, tokens)
+ * - Uses generic messages in production
+ * - Includes detailed debugging info in development
+ * - Logs errors with request context
+ */
+@Catch()
+export class GlobalExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(GlobalExceptionFilter.name);
+  private readonly isProduction: boolean;
+
+  constructor() {
+    this.isProduction = process.env.NODE_ENV === 'production';
+  }
+
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    // Extract error details
+    const { status, message, error } = this.extractErrorDetails(exception);
+
+    // Build error response
+    const errorResponse: ErrorResponse = {
+      statusCode: status,
+      message: this.sanitizeMessage(message, status),
+      error: error,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+    };
+
+    // Add debugging info in development
+    if (!this.isProduction) {
+      errorResponse.details = this.getDetailedMessage(exception);
+      if (exception instanceof Error) {
+        errorResponse.stack = exception.stack;
+      }
+    }
+
+    // Log the error
+    this.logError(exception, request, status);
+
+    response.status(status).json(errorResponse);
+  }
+
+  /**
+   * Extract status code, message, and error name from exception
+   */
+  private extractErrorDetails(exception: unknown): {
+    status: number;
+    message: string;
+    error: string;
+  } {
+    if (exception instanceof HttpException) {
+      const response = exception.getResponse();
+      const message = typeof response === 'string' 
+        ? response 
+        : (response as any).message || exception.message;
+
+      return {
+        status: exception.getStatus(),
+        message: Array.isArray(message) ? message.join(', ') : message,
+        error: exception.name || 'Error',
+      };
+    }
+
+    if (exception instanceof Error) {
+      // Prisma errors
+      if (exception.name === 'PrismaClientKnownRequestError') {
+        return this.handlePrismaError(exception as any);
+      }
+
+      return {
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: exception.message,
+        error: exception.name,
+      };
+    }
+
+    return {
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+      message: 'An unexpected error occurred',
+      error: 'Internal Server Error',
+    };
+  }
+
+  /**
+   * Handle Prisma-specific errors
+   */
+  private handlePrismaError(error: any): {
+    status: number;
+    message: string;
+    error: string;
+  } {
+    const code = error.code;
+
+    switch (code) {
+      case 'P2002': // Unique constraint violation
+        return {
+          status: HttpStatus.CONFLICT,
+          message: 'A record with this value already exists',
+          error: 'Conflict',
+        };
+      case 'P2025': // Record not found
+        return {
+          status: HttpStatus.NOT_FOUND,
+          message: 'The requested record was not found',
+          error: 'Not Found',
+        };
+      case 'P2003': // Foreign key constraint
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          message: 'Invalid reference to related record',
+          error: 'Bad Request',
+        };
+      default:
+        return {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          message: 'Database operation failed',
+          error: 'Internal Server Error',
+        };
+    }
+  }
+
+  /**
+   * Sanitize error message for production
+   */
+  private sanitizeMessage(message: string, status: number): string {
+    if (!this.isProduction) {
+      return message;
+    }
+
+    // Use generic message for server errors
+    if (status >= 500) {
+      return GENERIC_MESSAGES[status] || GENERIC_MESSAGES[500];
+    }
+
+    // For client errors, sanitize but try to keep useful info
+    let sanitized = message;
+
+    // Remove sensitive patterns
+    for (const pattern of SENSITIVE_PATTERNS) {
+      sanitized = sanitized.replace(pattern, '[REDACTED]');
+    }
+
+    // If message was heavily redacted, use generic
+    if (sanitized.includes('[REDACTED]') && sanitized.length < 20) {
+      return GENERIC_MESSAGES[status] || message;
+    }
+
+    return sanitized;
+  }
+
+  /**
+   * Get detailed message for development
+   */
+  private getDetailedMessage(exception: unknown): string {
+    if (exception instanceof HttpException) {
+      const response = exception.getResponse();
+      return typeof response === 'object' 
+        ? JSON.stringify(response, null, 2)
+        : String(response);
+    }
+
+    if (exception instanceof Error) {
+      return exception.message;
+    }
+
+    return String(exception);
+  }
+
+  /**
+   * Log the error with context
+   */
+  private logError(exception: unknown, request: Request, status: number): void {
+    const userId = (request as any).user?.userId || 'anonymous';
+    const orgId = (request as any).user?.organizationId || 'unknown';
+    const method = request.method;
+    const url = request.url;
+    const ip = request.ip || request.headers['x-forwarded-for'];
+
+    const logContext = {
+      statusCode: status,
+      path: url,
+      method,
+      userId,
+      organizationId: orgId,
+      ip,
+    };
+
+    if (status >= 500) {
+      // Server errors - log with full details
+      this.logger.error(
+        `${method} ${url} - ${status}`,
+        exception instanceof Error ? exception.stack : String(exception),
+      );
+    } else if (status >= 400) {
+      // Client errors - warn level
+      this.logger.warn(`${method} ${url} - ${status}`, JSON.stringify(logContext));
+    }
+  }
+}
+
+/**
+ * Export alias for backward compatibility
+ */
+export { GlobalExceptionFilter as HttpExceptionFilter };
