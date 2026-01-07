@@ -77,6 +77,7 @@ export class ImportConfigResponseDto {
 
   @ApiProperty({
     type: 'object',
+    additionalProperties: true,
     description: 'Change plan summary (for dry run)',
   })
   plan?: {

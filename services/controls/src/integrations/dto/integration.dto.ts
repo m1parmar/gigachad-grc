@@ -249,7 +249,7 @@ export class CreateIntegrationDto {
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ type: 'object' })
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   @IsObject()
   @IsOptional()
   config?: Record<string, any>;
@@ -276,7 +276,7 @@ export class UpdateIntegrationDto {
   @IsOptional()
   status?: IntegrationStatus;
 
-  @ApiPropertyOptional({ type: 'object' })
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   @IsObject()
   @IsOptional()
   config?: Record<string, any>;

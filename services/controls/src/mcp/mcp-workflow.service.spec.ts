@@ -4,6 +4,15 @@ import { MCPWorkflowService } from './mcp-workflow.service';
 import { MCPClientService } from './mcp-client.service';
 import { PrismaService } from '../prisma/prisma.service';
 
+// Mock Prometheus Counter
+const mockCounter = {
+  inc: jest.fn(),
+  labels: jest.fn().mockReturnThis(),
+};
+
+// The injection token used by @InjectMetric decorator
+const METRIC_TOKEN = 'PROM_METRIC_MCP_WORKFLOW_EXECUTIONS_TOTAL';
+
 // Simple MCPClientService mock
 class MCPClientServiceMock {
   public calls: Array<{ serverId: string; toolName: string; args: any }> = [];
@@ -37,6 +46,7 @@ describe('MCPWorkflowService - resilience features', () => {
         MCPWorkflowService,
         { provide: MCPClientService, useValue: mcpClient },
         { provide: PrismaService, useValue: {} },
+        { provide: METRIC_TOKEN, useValue: mockCounter },
       ],
     })
       .setLogger(new Logger('MCPWorkflowServiceTest'))

@@ -6,6 +6,12 @@ import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { STORAGE_PROVIDER } from '@gigachad-grc/shared';
 
+// Mock Prometheus Counter
+const mockCounter = {
+  inc: jest.fn(),
+  labels: jest.fn().mockReturnThis(),
+};
+
 describe('CollectorsService - resilience features', () => {
   let service: CollectorsService;
 
@@ -17,6 +23,7 @@ describe('CollectorsService - resilience features', () => {
         { provide: AuditService, useValue: {} },
         { provide: NotificationsService, useValue: {} },
         { provide: STORAGE_PROVIDER, useValue: {} },
+        { provide: 'PROM_METRIC_COLLECTORS_RUNS_TOTAL', useValue: mockCounter },
       ],
     })
       // Override the logger to avoid noisy test output

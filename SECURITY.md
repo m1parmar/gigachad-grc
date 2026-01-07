@@ -221,6 +221,34 @@ This platform helps maintain compliance with:
 - Review and rotate API keys
 - Security scan of containers
 - Penetration testing (external)
+- Check for updates to known vulnerability exceptions (see below)
+
+## Known Vulnerability Exceptions (Pending Upstream Fixes)
+
+The following vulnerabilities have been identified but cannot be resolved without upstream fixes. These should be monitored for updates:
+
+### @babel/runtime (Moderate - GHSA-968p-4wvh-cqc8)
+- **Package**: `@okta/okta-auth-js` → `broadcast-channel` → `@babel/runtime`
+- **Description**: Babel has inefficient RegExp complexity in generated code with `.replace` when transpiling named capturing groups
+- **Status**: Transitive dependency. Waiting for `@okta/okta-auth-js` to update `broadcast-channel`
+- **Mitigation**: Low risk - affects RegExp performance, not security directly
+- **Monitor**: Check `@okta/okta-auth-js` releases for updates
+
+### @modelcontextprotocol/sdk (High - GHSA-8r9q-7v3j-jr4g)
+- **Package**: `@modelcontextprotocol/sdk` (MCP servers)
+- **Description**: ReDoS vulnerability in MCP TypeScript SDK
+- **Status**: Currently on latest version (1.25.1). Advisory may be stale or fix not yet released
+- **Mitigation**: MCP servers are internal-only, not exposed to untrusted input
+- **Monitor**: Check `@modelcontextprotocol/sdk` releases and GitHub advisory for updates
+
+### js-yaml (Moderate - GHSA-mh29-5h37-fv8m)
+- **Package**: `eslint` → `@eslint/eslintrc` → `js-yaml`
+- **Description**: Prototype pollution in merge (`<<`) operator
+- **Status**: Transitive dependency. Waiting for `eslint` to update
+- **Mitigation**: Only affects YAML parsing in linting tools, not runtime code
+- **Monitor**: Check `eslint` releases for updates
+
+**Last reviewed**: January 2026
 
 ### Quarterly
 - Full security audit

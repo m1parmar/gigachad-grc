@@ -42,14 +42,18 @@ describe('PaginationLimitPipe', () => {
       expect(loggerWarnSpy).not.toHaveBeenCalled();
     });
 
-    it('should return default for empty string', () => {
+    it('should return default for empty string with warning', () => {
       expect(pipe.transform('', metadata)).toBe(DEFAULT_PAGINATION_LIMIT);
-      expect(loggerWarnSpy).not.toHaveBeenCalled();
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        `Invalid pagination limit provided: empty string. Using default: ${DEFAULT_PAGINATION_LIMIT}`
+      );
     });
 
-    it('should return default for NaN number', () => {
+    it('should return default for NaN number with warning', () => {
       expect(pipe.transform(NaN, metadata)).toBe(DEFAULT_PAGINATION_LIMIT);
-      expect(loggerWarnSpy).not.toHaveBeenCalled();
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        `Invalid pagination limit provided: NaN. Using default: ${DEFAULT_PAGINATION_LIMIT}`
+      );
     });
   });
 
@@ -176,14 +180,18 @@ describe('PaginationPagePipe', () => {
       expect(loggerWarnSpy).not.toHaveBeenCalled();
     });
 
-    it('should return default for empty string', () => {
+    it('should return default for empty string with warning', () => {
       expect(pipe.transform('', metadata)).toBe(1);
-      expect(loggerWarnSpy).not.toHaveBeenCalled();
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        'Invalid pagination page provided: empty string. Using default: 1'
+      );
     });
 
-    it('should return default for NaN number', () => {
+    it('should return default for NaN number with warning', () => {
       expect(pipe.transform(NaN, metadata)).toBe(1);
-      expect(loggerWarnSpy).not.toHaveBeenCalled();
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        'Invalid pagination page provided: NaN. Using default: 1'
+      );
     });
   });
 
