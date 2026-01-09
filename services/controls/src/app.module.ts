@@ -36,9 +36,13 @@ import { JiraModule } from './integrations/jira/jira.module';
 import { ServiceNowModule } from './integrations/servicenow/servicenow.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { JobsModule } from './jobs/jobs.module';
-// Note: SearchModule, WebhooksModule, ScimModule, SessionsModule, WorkflowsModule,
-// ExportsModule, CustomFieldsModule, DelegationModule, RetentionModule
-// are partially implemented and will be enabled in a future release
+import { SearchModule } from './search/search.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
+import { SessionsModule } from './sessions/sessions.module';
+import { ExportsModule } from './exports/exports.module';
+import { CustomFieldsModule } from './custom-fields/custom-fields.module';
+import { DelegationModule } from './delegation/delegation.module';
+import { RetentionModule } from './retention/retention.module';
 import { ModulesController } from './modules/modules.controller';
 import { CustomThrottlerGuard } from './auth/throttler.guard';
 import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
@@ -115,6 +119,13 @@ import {
     ServiceNowModule,
     DepartmentsModule,
     JobsModule,
+    SearchModule,
+    WebhooksModule,
+    SessionsModule,
+    ExportsModule,
+    CustomFieldsModule,
+    DelegationModule,
+    RetentionModule,
   ],
   controllers: [ModulesController],
   providers: [
