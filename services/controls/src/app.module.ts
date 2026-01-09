@@ -31,6 +31,14 @@ import { BulkOperationsModule } from './common/bulk-operations.module';
 import { SystemModule } from './system/system.module';
 import { ConfigAsCodeModule } from './config-as-code/config-as-code.module';
 import { FrameworkCatalogModule } from './frameworks/catalog.module';
+// New enterprise modules (Phase 2)
+import { JiraModule } from './integrations/jira/jira.module';
+import { ServiceNowModule } from './integrations/servicenow/servicenow.module';
+import { DepartmentsModule } from './departments/departments.module';
+import { JobsModule } from './jobs/jobs.module';
+// Note: SearchModule, WebhooksModule, ScimModule, SessionsModule, WorkflowsModule,
+// ExportsModule, CustomFieldsModule, DelegationModule, RetentionModule
+// are partially implemented and will be enabled in a future release
 import { ModulesController } from './modules/modules.controller';
 import { CustomThrottlerGuard } from './auth/throttler.guard';
 import { CorrelationIdMiddleware } from './common/correlation-id.middleware';
@@ -102,6 +110,11 @@ import {
     SystemModule,
     ConfigAsCodeModule,
     FrameworkCatalogModule,
+    // New enterprise modules (Phase 2)
+    JiraModule,
+    ServiceNowModule,
+    DepartmentsModule,
+    JobsModule,
   ],
   controllers: [ModulesController],
   providers: [

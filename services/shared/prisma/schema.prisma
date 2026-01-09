@@ -662,6 +662,10 @@ model Organization {
   configResourceStates      ConfigResourceState[]      @relation("OrgConfigResourceStates")
   configApplyHistory        ConfigApplyHistory[]       @relation("OrgConfigApplyHistory")
   configApplyLocks          ConfigApplyLock[]          @relation("OrgConfigApplyLocks")
+  webhookSubscriptions      WebhookSubscription[]
+  jiraConnection            JiraConnection?
+  serviceNowConnection      ServiceNowConnection?
+  departments               Department[]
 
   @@map("organizations")
 }
@@ -910,6 +914,13 @@ model User {
 
   // Workspace memberships (for multi-workspace orgs)
   workspaceMembers WorkspaceMember[]
+
+  // SCIM provisioning
+  scimExternalId ScimExternalId?
+
+  // Department memberships
+  departmentMemberships UserDepartment[]
+  headOfDepartments     Department[]     @relation("DepartmentHead")
 
   @@unique([organizationId, email])
   @@map("users")
@@ -1724,6 +1735,54 @@ model WebhookEvent {
   @@map("webhook_events")
 }
 
+// Outbound Webhook Subscriptions (for sending events to external systems)
+model WebhookSubscription {
+  id                  String    @id @default(uuid())
+  organizationId      String    @map("organization_id")
+  name                String
+  url                 String
+  description         String?
+  events              String[]  // Array of event types to subscribe to
+  secret              String    // Secret for signature verification
+  isActive            Boolean   @default(true) @map("is_active")
+  headers             String?   // JSON string of custom headers
+  createdBy           String    @map("created_by")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  lastDeliveryAt      DateTime? @map("last_delivery_at")
+  lastDeliveryStatus  String?   @map("last_delivery_status")
+  consecutiveFailures Int       @default(0) @map("consecutive_failures")
+
+  // Relations
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  deliveries   WebhookDelivery[]
+
+  @@index([organizationId, isActive])
+  @@map("webhook_subscriptions")
+}
+
+model WebhookDelivery {
+  id             String    @id @default(uuid())
+  subscriptionId String    @map("subscription_id")
+  event          String
+  payload        Json
+  status         String    @default("pending") // pending, delivering, delivered, failed, retrying
+  responseStatus Int?      @map("response_status")
+  responseBody   String?   @map("response_body")
+  attempts       Int       @default(0)
+  nextRetryAt    DateTime? @map("next_retry_at")
+  deliveredAt    DateTime? @map("delivered_at")
+  errorMessage   String?   @map("error_message")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  subscription WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, status])
+  @@index([status, nextRetryAt])
+  @@map("webhook_deliveries")
+}
+
 model ComplianceCheck {
   id                String    @id @default(uuid())
   organizationId    String    @map("organization_id")
@@ -1937,8 +1996,12 @@ model PermissionGroup {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   // Relations
-  members      UserGroupMembership[]
-  organization Organization          @relation(fields: [organizationId], references: [id])
+  members          UserGroupMembership[]
+  organization     Organization          @relation(fields: [organizationId], references: [id])
+  scimExternalId   ScimGroupExternalId?
+  parentGroups     PermissionGroupHierarchy[] @relation("ChildGroup")
+  childGroups      PermissionGroupHierarchy[] @relation("ParentGroup")
+  departmentScopes PermissionGroupDepartmentScope[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -4877,4 +4940,580 @@ model AuditAnalyticsSnapshot {
   @@unique([organizationId, snapshotDate, snapshotType])
   @@index([organizationId, snapshotDate])
   @@map("audit_analytics_snapshots")
+}
+
+// ===========================================
+// SCIM Provisioning
+// ===========================================
+
+model ScimProviderConfig {
+  id              String    @id @default(uuid())
+  organizationId  String    @unique @map("organization_id")
+  provider        String    // okta, azure_ad, onelogin, google, generic
+  bearerToken     String    @map("bearer_token") // Hashed token
+  enabled         Boolean   @default(true)
+  defaultGroupIds Json      @default("[]") @map("default_group_ids")
+  defaultRole     String?   @map("default_role")
+  lastSyncAt      DateTime? @map("last_sync_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("scim_provider_configs")
+}
+
+model ScimExternalId {
+  id         String @id @default(uuid())
+  userId     String @unique @map("user_id")
+  externalId String @map("external_id")
+  provider   String
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([externalId, provider])
+  @@map("scim_external_ids")
+}
+
+model ScimGroupExternalId {
+  id         String @id @default(uuid())
+  groupId    String @unique @map("group_id")
+  externalId String @map("external_id")
+  provider   String
+
+  // Relations
+  group PermissionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([externalId, provider])
+  @@map("scim_group_external_ids")
+}
+
+// ===========================================
+// Approval Workflows
+// ===========================================
+
+model ApprovalWorkflow {
+  id                String    @id @default(uuid())
+  organizationId    String    @map("organization_id")
+  name              String
+  description       String?
+  entityType        String    @map("entity_type") // policy, risk, control, vendor, etc.
+  mode              String    @default("sequential") // sequential, parallel, any
+  steps             Json      // Array of workflow steps
+  triggerConditions Json?     @map("trigger_conditions") // JSON logic for auto-triggering
+  isActive          Boolean   @default(true) @map("is_active")
+  createdBy         String    @map("created_by")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  requests ApprovalRequest[]
+
+  @@index([organizationId, entityType])
+  @@index([organizationId, isActive])
+  @@map("approval_workflows")
+}
+
+model ApprovalRequest {
+  id              String    @id @default(uuid())
+  workflowId      String    @map("workflow_id")
+  organizationId  String    @map("organization_id")
+  entityType      String    @map("entity_type")
+  entityId        String    @map("entity_id")
+  entityName      String?   @map("entity_name")
+  title           String
+  justification   String?
+  priority        String    @default("medium")
+  status          String    @default("pending") // pending, approved, rejected, cancelled, expired
+  currentStep     Int       @default(1) @map("current_step")
+  requestedBy     String    @map("requested_by")
+  requestedByName String    @map("requested_by_name")
+  completedAt     DateTime? @map("completed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  workflow ApprovalWorkflow @relation(fields: [workflowId], references: [id])
+  steps    ApprovalStep[]
+
+  @@index([organizationId, status])
+  @@index([workflowId, status])
+  @@index([requestedBy])
+  @@index([entityType, entityId])
+  @@map("approval_requests")
+}
+
+model ApprovalStep {
+  id              String    @id @default(uuid())
+  requestId       String    @map("request_id")
+  stepNumber      Int       @map("step_number")
+  stepName        String    @map("step_name")
+  approverType    String    @map("approver_type") // user, role, group, manager, owner
+  approverValue   String    @map("approver_value") // userId, role name, groupId
+  requireComment  Boolean   @default(false) @map("require_comment")
+  status          String    @default("waiting") // waiting, pending, approved, rejected
+  approverId      String?   @map("approver_id")
+  approverName    String?   @map("approver_name")
+  comment         String?
+  conditions      Json?     // Conditions attached to approval
+  decidedAt       DateTime? @map("decided_at")
+  dueAt           DateTime? @map("due_at")
+  escalateToUserId String?  @map("escalate_to_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  request ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, stepNumber])
+  @@index([approverType, approverValue, status])
+  @@map("approval_steps")
+}
+
+// ===========================================
+// Data Export Jobs
+// ===========================================
+
+model ExportJob {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  entityType     String    @map("entity_type") // controls, policies, risks, etc.
+  format         String    // json, csv, xlsx, pdf
+  name           String?
+  status         String    @default("pending") // pending, processing, completed, failed, expired
+  progress       Int       @default(0) // 0-100
+  recordCount    Int?      @map("record_count")
+  fileSize       Int?      @map("file_size") // bytes
+  storagePath    String?   @map("storage_path")
+  downloadUrl    String?   @map("download_url")
+  downloadUrlExpiresAt DateTime? @map("download_url_expires_at")
+  config         Json      @default("{}") // Export configuration options
+  errorMessage   String?   @map("error_message")
+  requestedBy    String    @map("requested_by")
+  completedAt    DateTime? @map("completed_at")
+  expiresAt      DateTime? @map("expires_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([organizationId, status])
+  @@index([organizationId, entityType])
+  @@index([expiresAt])
+  @@map("export_jobs")
+}
+
+// ===========================================
+// Custom Fields
+// ===========================================
+
+model CustomFieldDefinition {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  name           String    // Internal field name
+  label          String    // Display label
+  description    String?
+  fieldType      String    @map("field_type") // text, number, date, select, etc.
+  entityTypes    String[]  @map("entity_types") // Which entity types this applies to
+  isRequired     Boolean   @default(false) @map("is_required")
+  defaultValue   Json?     @map("default_value")
+  placeholder    String?
+  options        Json?     // For select/multi-select fields
+  validation     Json?     // Validation rules
+  order          Int       @default(0)
+  group          String?   // Grouping for UI organization
+  showInList     Boolean   @default(false) @map("show_in_list")
+  searchable     Boolean   @default(false)
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  values CustomFieldValue[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+  @@map("custom_field_definitions")
+}
+
+model CustomFieldValue {
+  id         String   @id @default(uuid())
+  fieldId    String   @map("field_id")
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  value      Json
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  field CustomFieldDefinition @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([fieldId, entityType, entityId])
+  @@index([entityType, entityId])
+  @@map("custom_field_values")
+}
+
+// ===========================================
+// User Delegation
+// ===========================================
+
+model UserDelegation {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  delegatorId    String    @map("delegator_id")
+  delegatorName  String    @map("delegator_name")
+  delegateId     String    @map("delegate_id")
+  delegateName   String    @map("delegate_name")
+  startDate      DateTime  @map("start_date")
+  endDate        DateTime  @map("end_date")
+  scope          String    // all, approvals, tasks, reviews, specific
+  entityTypes    String[]  @map("entity_types") @default([])
+  entityIds      String[]  @map("entity_ids") @default([])
+  reason         String?
+  status         String    @default("pending") // pending, active, expired, revoked, declined
+  acceptedAt     DateTime? @map("accepted_at")
+  revokedAt      DateTime? @map("revoked_at")
+  revokedBy      String?   @map("revoked_by")
+  revokeReason   String?   @map("revoke_reason")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@index([organizationId, delegatorId, status])
+  @@index([organizationId, delegateId, status])
+  @@index([status, startDate, endDate])
+  @@map("user_delegations")
+}
+
+// ===========================================
+// Data Retention Policies
+// ===========================================
+
+model RetentionPolicy {
+  id                  String    @id @default(uuid())
+  organizationId      String    @map("organization_id")
+  entityType          String    @map("entity_type") // audit_logs, evidence, etc.
+  periodValue         Int       @map("period_value")
+  periodUnit          String    @map("period_unit") // days, months, years
+  action              String    // archive, delete, anonymize
+  isEnabled           Boolean   @default(true) @map("is_enabled")
+  filterConditions    Json?     @map("filter_conditions")
+  description         String?
+  requireConfirmation Boolean   @default(true) @map("require_confirmation")
+  notifyBeforeAction  Boolean   @default(true) @map("notify_before_action")
+  notifyDaysBefore    Int?      @map("notify_days_before")
+  lastRunAt           DateTime? @map("last_run_at")
+  lastRunResult       String?   @map("last_run_result")
+  recordsAffected     Int?      @map("records_affected")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@unique([organizationId, entityType])
+  @@index([organizationId, isEnabled])
+  @@map("retention_policies")
+}
+
+// ===========================================
+// Jira Integration Models
+// ===========================================
+
+model JiraConnection {
+  id              String    @id @default(uuid())
+  organizationId  String    @unique @map("organization_id")
+  instanceUrl     String    @map("instance_url")
+  credentials     String?   @db.Text // Encrypted JSON: { clientId, clientSecret, apiToken, userEmail }
+  accessToken     String?   @map("access_token") @db.Text
+  refreshToken    String?   @map("refresh_token") @db.Text
+  tokenExpiresAt  DateTime? @map("token_expires_at")
+  isConnected     Boolean   @default(false) @map("is_connected")
+  connectedAt     DateTime? @map("connected_at")
+  connectionError String?   @map("connection_error")
+  lastSyncAt      DateTime? @map("last_sync_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  organization    Organization         @relation(fields: [organizationId], references: [id])
+  mappings        JiraProjectMapping[]
+
+  @@map("jira_connections")
+}
+
+model JiraProjectMapping {
+  id              String    @id @default(uuid())
+  organizationId  String    @map("organization_id")
+  jiraProjectKey  String    @map("jira_project_key")
+  jiraProjectName String    @map("jira_project_name")
+  grcEntityType   String    @map("grc_entity_type") // risk, finding, task, remediation, control_gap
+  jiraIssueType   String    @map("jira_issue_type")
+  syncDirection   String    @map("sync_direction") // grc_to_jira, jira_to_grc, bidirectional
+  fieldMappings   Json?     @map("field_mappings")
+  statusMappings  Json?     @map("status_mappings")
+  autoCreate      Boolean   @default(false) @map("auto_create")
+  autoSyncStatus  Boolean   @default(true) @map("auto_sync_status")
+  syncComments    Boolean   @default(false) @map("sync_comments")
+  syncAttachments Boolean   @default(false) @map("sync_attachments")
+  jqlFilter       String?   @map("jql_filter") @db.Text
+  isEnabled       Boolean   @default(true) @map("is_enabled")
+  lastSyncAt      DateTime? @map("last_sync_at")
+  syncedIssueCount Int?     @map("synced_issue_count")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  connection      JiraConnection?   @relation(fields: [organizationId], references: [organizationId])
+  issueLinks      JiraIssueLink[]
+
+  @@unique([organizationId, jiraProjectKey, grcEntityType])
+  @@index([organizationId, isEnabled])
+  @@map("jira_project_mappings")
+}
+
+model JiraIssueLink {
+  id              String    @id @default(uuid())
+  organizationId  String    @map("organization_id")
+  mappingId       String    @map("mapping_id")
+  jiraKey         String    @map("jira_key")
+  jiraId          String    @map("jira_id")
+  jiraUrl         String    @map("jira_url")
+  grcEntityType   String    @map("grc_entity_type")
+  grcEntityId     String    @map("grc_entity_id")
+  lastSyncedAt    DateTime  @map("last_synced_at")
+  syncStatus      String    @default("synced") @map("sync_status") // synced, pending, error
+  syncError       String?   @map("sync_error")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  mapping         JiraProjectMapping @relation(fields: [mappingId], references: [id], onDelete: Cascade)
+
+  @@unique([mappingId, jiraKey])
+  @@unique([mappingId, grcEntityType, grcEntityId])
+  @@index([organizationId, grcEntityType, grcEntityId])
+  @@map("jira_issue_links")
+}
+
+// ===========================================
+// ServiceNow Integration Models
+// ===========================================
+
+model ServiceNowConnection {
+  id              String    @id @default(uuid())
+  organizationId  String    @unique @map("organization_id")
+  instanceUrl     String    @map("instance_url") // e.g., https://company.service-now.com
+  authType        String    @map("auth_type") // basic, oauth
+  credentials     String?   @db.Text // Encrypted JSON
+  accessToken     String?   @map("access_token") @db.Text
+  refreshToken    String?   @map("refresh_token") @db.Text
+  tokenExpiresAt  DateTime? @map("token_expires_at")
+  isConnected     Boolean   @default(false) @map("is_connected")
+  connectedAt     DateTime? @map("connected_at")
+  connectionError String?   @map("connection_error")
+  lastSyncAt      DateTime? @map("last_sync_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  organization    Organization            @relation(fields: [organizationId], references: [id])
+  mappings        ServiceNowTableMapping[]
+
+  @@map("servicenow_connections")
+}
+
+model ServiceNowTableMapping {
+  id                  String    @id @default(uuid())
+  organizationId      String    @map("organization_id")
+  snowTableName       String    @map("snow_table_name") // e.g., incident, change_request, problem
+  snowTableLabel      String    @map("snow_table_label")
+  grcEntityType       String    @map("grc_entity_type") // risk, finding, task, remediation
+  syncDirection       String    @map("sync_direction") // grc_to_snow, snow_to_grc, bidirectional
+  fieldMappings       Json?     @map("field_mappings")
+  statusMappings      Json?     @map("status_mappings")
+  priorityMappings    Json?     @map("priority_mappings")
+  autoCreate          Boolean   @default(false) @map("auto_create")
+  autoSyncStatus      Boolean   @default(true) @map("auto_sync_status")
+  syncAttachments     Boolean   @default(false) @map("sync_attachments")
+  syncWorkNotes       Boolean   @default(false) @map("sync_work_notes")
+  queryFilter         String?   @map("query_filter") @db.Text // ServiceNow encoded query
+  assignmentGroupId   String?   @map("assignment_group_id")
+  categoryId          String?   @map("category_id")
+  isEnabled           Boolean   @default(true) @map("is_enabled")
+  lastSyncAt          DateTime? @map("last_sync_at")
+  syncedRecordCount   Int?      @map("synced_record_count")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  connection          ServiceNowConnection?  @relation(fields: [organizationId], references: [organizationId])
+  recordLinks         ServiceNowRecordLink[]
+
+  @@unique([organizationId, snowTableName, grcEntityType])
+  @@index([organizationId, isEnabled])
+  @@map("servicenow_table_mappings")
+}
+
+model ServiceNowRecordLink {
+  id              String    @id @default(uuid())
+  organizationId  String    @map("organization_id")
+  mappingId       String    @map("mapping_id")
+  snowSysId       String    @map("snow_sys_id")
+  snowNumber      String    @map("snow_number") // e.g., INC0001234
+  snowUrl         String    @map("snow_url")
+  grcEntityType   String    @map("grc_entity_type")
+  grcEntityId     String    @map("grc_entity_id")
+  lastSyncedAt    DateTime  @map("last_synced_at")
+  syncStatus      String    @default("synced") @map("sync_status")
+  syncError       String?   @map("sync_error")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  mapping         ServiceNowTableMapping @relation(fields: [mappingId], references: [id], onDelete: Cascade)
+
+  @@unique([mappingId, snowSysId])
+  @@unique([mappingId, grcEntityType, grcEntityId])
+  @@index([organizationId, grcEntityType, grcEntityId])
+  @@map("servicenow_record_links")
+}
+
+// ===========================================
+// Department and Nested Group RBAC
+// ===========================================
+
+model Department {
+  id              String       @id @default(uuid())
+  organizationId  String       @map("organization_id")
+  name            String
+  code            String       // Short code like "IT", "HR", "FIN"
+  description     String?
+  parentId        String?      @map("parent_id")
+  headUserId      String?      @map("head_user_id")
+  isActive        Boolean      @default(true) @map("is_active")
+  metadata        Json?
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  parent          Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children        Department[] @relation("DepartmentHierarchy")
+  headUser        User?        @relation("DepartmentHead", fields: [headUserId], references: [id])
+  members         UserDepartment[]
+  groupScopes     PermissionGroupDepartmentScope[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, isActive])
+  @@index([parentId])
+  @@map("departments")
+}
+
+model UserDepartment {
+  id              String     @id @default(uuid())
+  userId          String     @map("user_id")
+  departmentId    String     @map("department_id")
+  isPrimary       Boolean    @default(false) @map("is_primary")
+  role            String?    // Optional role within department
+  startDate       DateTime?  @map("start_date")
+  endDate         DateTime?  @map("end_date")
+  createdAt       DateTime   @default(now()) @map("created_at")
+
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department      Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, departmentId])
+  @@index([departmentId])
+  @@map("user_departments")
+}
+
+model PermissionGroupHierarchy {
+  id              String          @id @default(uuid())
+  parentGroupId   String          @map("parent_group_id")
+  childGroupId    String          @map("child_group_id")
+  inheritPermissions Boolean      @default(true) @map("inherit_permissions")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  parentGroup     PermissionGroup @relation("ParentGroup", fields: [parentGroupId], references: [id], onDelete: Cascade)
+  childGroup      PermissionGroup @relation("ChildGroup", fields: [childGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([parentGroupId, childGroupId])
+  @@index([childGroupId])
+  @@map("permission_group_hierarchies")
+}
+
+model PermissionGroupDepartmentScope {
+  id              String          @id @default(uuid())
+  groupId         String          @map("group_id")
+  departmentId    String          @map("department_id")
+  scopeType       String          @map("scope_type") // full, read_only, limited
+  includeChildren Boolean         @default(true) @map("include_children")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  group           PermissionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  department      Department      @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, departmentId])
+  @@index([departmentId])
+  @@map("permission_group_department_scopes")
+}
+
+// ===========================================
+// Job Queue Models (BullMQ Persistence)
+// ===========================================
+
+model JobQueue {
+  id              String    @id @default(uuid())
+  name            String    @unique
+  description     String?
+  isPaused        Boolean   @default(false) @map("is_paused")
+  concurrency     Int       @default(1)
+  maxRetries      Int       @default(3) @map("max_retries")
+  retryDelay      Int       @default(5000) @map("retry_delay") // ms
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  jobs            Job[]
+  scheduledJobs   ScheduledJob[]
+
+  @@map("job_queues")
+}
+
+model Job {
+  id              String    @id @default(uuid())
+  queueId         String    @map("queue_id")
+  name            String
+  data            Json
+  status          String    @default("pending") // pending, active, completed, failed, delayed
+  priority        Int       @default(0)
+  attempts        Int       @default(0)
+  maxAttempts     Int       @default(3) @map("max_attempts")
+  progress        Int       @default(0)
+  result          Json?
+  error           String?   @db.Text
+  stackTrace      String?   @map("stack_trace") @db.Text
+  processedAt     DateTime? @map("processed_at")
+  completedAt     DateTime? @map("completed_at")
+  failedAt        DateTime? @map("failed_at")
+  delayUntil      DateTime? @map("delay_until")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  queue           JobQueue  @relation(fields: [queueId], references: [id], onDelete: Cascade)
+
+  @@index([queueId, status])
+  @@index([status, delayUntil])
+  @@index([createdAt])
+  @@map("jobs")
+}
+
+model ScheduledJob {
+  id              String    @id @default(uuid())
+  queueId         String    @map("queue_id")
+  name            String
+  description     String?
+  cronExpression  String    @map("cron_expression")
+  timezone        String    @default("UTC")
+  data            Json?
+  isEnabled       Boolean   @default(true) @map("is_enabled")
+  lastRunAt       DateTime? @map("last_run_at")
+  nextRunAt       DateTime? @map("next_run_at")
+  lastRunStatus   String?   @map("last_run_status")
+  lastRunError    String?   @map("last_run_error") @db.Text
+  runCount        Int       @default(0) @map("run_count")
+  failCount       Int       @default(0) @map("fail_count")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  queue           JobQueue  @relation(fields: [queueId], references: [id], onDelete: Cascade)
+
+  @@unique([queueId, name])
+  @@index([isEnabled, nextRunAt])
+  @@map("scheduled_jobs")
 }
