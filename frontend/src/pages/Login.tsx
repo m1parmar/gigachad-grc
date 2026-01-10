@@ -31,7 +31,7 @@ export default function Login() {
     );
   }
 
-  const isDev = import.meta.env.DEV;
+  const isDev = import.meta.env.VITE_ENABLE_DEV_AUTH === 'true';
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-surface-950 px-4">

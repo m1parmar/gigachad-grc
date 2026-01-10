@@ -59,14 +59,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('Token parsed:', tokenParsed);
       console.log('Profile:', profile);
 
-      const role = tokenParsed?.roles?.[0] || 
+      const role = tokenParsed?.roles?.[0] ||
         tokenParsed?.realm_access?.roles?.find(
           (r: string) => ['admin', 'compliance_manager', 'auditor', 'viewer'].includes(r)
         ) || 'viewer';
 
       const userId = kc.subject || '';
       const organizationId = tokenParsed?.organization_id || 'default';
-      
+
       const newUser = {
         id: userId,
         email: profile.email || '',
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         organizationId,
       };
       setUser(newUser);
-      
+
       // Set user for error tracking (Sentry)
       setErrorTrackingUser({
         id: userId,
@@ -125,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const kc = getKeycloak();
-      
+
       // Prevent double initialization
       if (initPromise) {
         try {
@@ -144,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         console.log('Initializing Keycloak...');
-        
+
         initPromise = kc.init({
           onLoad: 'check-sso',
           checkLoginIframe: false, // Disable iframe check which can cause issues
@@ -218,11 +218,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAuthenticated(false);
     setUser(null);
     setToken(null);
-    
+
     // Clear user from error tracking
     setErrorTrackingUser(null);
     addBreadcrumb({ category: 'auth', message: 'User logged out' });
-    
+
     // Only call keycloak logout if we were authenticated via keycloak
     if (kc.authenticated) {
       kc.logout({
@@ -233,8 +233,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Dev login bypass - only available in development
   const devLogin = useCallback(() => {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.VITE_ENABLE_DEV_AUTH === 'true') {
       console.log('Dev login activated');
+
       const devUser: User = {
         id: '8f88a42b-e799-455c-b68a-308d7d2e9aa4', // John Doe - seeded user
         email: 'john.doe@example.com',
@@ -261,7 +262,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasPermission = (permission: string): boolean => {
     if (!user) return false;
     if (user.role === 'admin') return true;
-    
+
     const rolePermissions: Record<string, string[]> = {
       compliance_manager: [
         'controls:view', 'controls:create', 'controls:update',
@@ -290,7 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         token,
         login,
         logout,
-        devLogin: import.meta.env.DEV ? devLogin : undefined,
+        devLogin: import.meta.env.VITE_ENABLE_DEV_AUTH === 'true' ? devLogin : undefined,
         hasRole,
         hasPermission,
       }}

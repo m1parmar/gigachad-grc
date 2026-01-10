@@ -23,11 +23,14 @@ COPY frontend/ ./
 # These are baked into the static build
 ARG VITE_API_URL=http://localhost:3001
 ARG VITE_ENABLE_AI_MODULE=true
+ARG VITE_KEYCLOAK_URL=http://localhost:8080
 
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_ENABLE_AI_MODULE=$VITE_ENABLE_AI_MODULE
+ENV VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL
 # Dev auth is enabled by default in development mode
 ENV VITE_ENABLE_DEV_AUTH=true
+
 
 # Build in development mode to allow dev auth
 RUN npm run build -- --mode development

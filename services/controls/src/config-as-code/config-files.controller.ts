@@ -45,7 +45,7 @@ import {
 export class ConfigFilesController {
   private readonly logger = new Logger(ConfigFilesController.name);
 
-  constructor(private readonly configFilesService: ConfigFilesService) {}
+  constructor(private readonly configFilesService: ConfigFilesService) { }
 
   // ===========================================
   // State Management Endpoints (MUST be before wildcard routes)
@@ -169,14 +169,14 @@ export class ConfigFilesController {
         throw error;
       }
     }
-    
+
     return this.configFilesService.listFiles(
       req.user.organizationId,
       workspaceId,
     );
   }
 
-  @Get(':path(*)')
+  @Get('*')
   @ApiOperation({ summary: 'Get a specific config file' })
   @ApiParam({ name: 'path', description: 'File path (e.g., controls/main.tf)' })
   @ApiResponse({
@@ -220,7 +220,7 @@ export class ConfigFilesController {
     );
   }
 
-  @Put(':path(*)')
+  @Put('*')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update an existing config file' })
   @ApiParam({ name: 'path', description: 'File path' })
@@ -247,7 +247,7 @@ export class ConfigFilesController {
     );
   }
 
-  @Delete(':path(*)')
+  @Delete('*')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a config file' })
   @ApiParam({ name: 'path', description: 'File path' })
@@ -313,7 +313,7 @@ export class ConfigFilesController {
     );
   }
 
-  @Get(':path(*)/versions')
+  @Get('*/versions')
   @ApiOperation({ summary: 'Get version history for a file' })
   @ApiParam({ name: 'path', description: 'File path' })
   @ApiResponse({

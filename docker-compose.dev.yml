@@ -36,7 +36,18 @@ services:
       NODE_ENV: development
     restart: unless-stopped
 
+  keycloak:
+    environment:
+      KC_DB_SCHEMA: keycloak
+    restart: unless-stopped
+
   frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_KEYCLOAK_URL: "http://localhost:8080"
+        VITE_API_URL: "http://localhost:3001"
     environment:
       NODE_ENV: development
       VITE_ENABLE_DEV_AUTH: "true"
