@@ -27,17 +27,6 @@ services:
     environment:
       NODE_ENV: development
 
-  integrations:
-    build:
-      context: ./services/integrations
-      dockerfile: Dockerfile.dev
-    volumes:
-      - ./services/integrations/src:/app/src
-      - ./services/shared:/app/shared
-      - /app/node_modules
-    environment:
-      NODE_ENV: development
-
   policies:
     build:
       context: ./services/policies
@@ -49,12 +38,34 @@ services:
     environment:
       NODE_ENV: development
 
-  mcp:
+  tprm:
     build:
-      context: ./services/mcp
+      context: ./services/tprm
       dockerfile: Dockerfile.dev
     volumes:
-      - ./services/mcp/src:/app/src
+      - ./services/tprm/src:/app/src
+      - ./services/shared:/app/shared
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+
+  trust:
+    build:
+      context: ./services/trust
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./services/trust/src:/app/src
+      - ./services/shared:/app/shared
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+
+  audit:
+    build:
+      context: ./services/audit
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./services/audit/src:/app/src
       - ./services/shared:/app/shared
       - /app/node_modules
     environment:
@@ -69,6 +80,3 @@ services:
       - /app/node_modules
     environment:
       NODE_ENV: development
-
-
-
