@@ -9,6 +9,7 @@ services:
   controls:
     environment:
       NODE_ENV: development
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:5173,http://35.226.135.159:3000"
     restart: unless-stopped
 
   frameworks:
