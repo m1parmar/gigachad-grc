@@ -49,26 +49,38 @@
     {
       "name": "Administrators",
       "path": "/Administrators",
-      "realmRoles": ["admin"]
+      "realmRoles": [
+        "admin"
+      ]
     },
     {
       "name": "Compliance Team",
       "path": "/Compliance Team",
-      "realmRoles": ["compliance_manager"]
+      "realmRoles": [
+        "compliance_manager"
+      ]
     },
     {
       "name": "Auditors",
       "path": "/Auditors",
-      "realmRoles": ["auditor"]
+      "realmRoles": [
+        "auditor"
+      ]
     },
     {
       "name": "Viewers",
       "path": "/Viewers",
-      "realmRoles": ["viewer"]
+      "realmRoles": [
+        "viewer"
+      ]
     }
   ],
-  "defaultRoles": ["viewer"],
-  "requiredCredentials": ["password"],
+  "defaultRoles": [
+    "viewer"
+  ],
+  "requiredCredentials": [
+    "password"
+  ],
   "passwordPolicy": "",
   "clients": [
     {
@@ -86,11 +98,15 @@
       "baseUrl": "/",
       "redirectUris": [
         "http://localhost:3000/*",
-        "http://localhost/*"
+        "http://localhost/*",
+        "http://35.226.135.159:3000/*",
+        "http://35.226.135.159/*"
       ],
       "webOrigins": [
         "http://localhost:3000",
         "http://localhost",
+        "http://35.226.135.159:3000",
+        "http://35.226.135.159",
         "+"
       ],
       "defaultClientScopes": [
@@ -212,9 +228,13 @@
           "temporary": true
         }
       ],
-      "realmRoles": ["admin"],
+      "realmRoles": [
+        "admin"
+      ],
       "attributes": {
-        "organization_id": ["default"]
+        "organization_id": [
+          "default"
+        ]
       }
     },
     {
@@ -231,9 +251,13 @@
           "temporary": true
         }
       ],
-      "realmRoles": ["compliance_manager"],
+      "realmRoles": [
+        "compliance_manager"
+      ],
       "attributes": {
-        "organization_id": ["default"]
+        "organization_id": [
+          "default"
+        ]
       }
     },
     {
@@ -250,9 +274,13 @@
           "temporary": true
         }
       ],
-      "realmRoles": ["auditor"],
+      "realmRoles": [
+        "auditor"
+      ],
       "attributes": {
-        "organization_id": ["default"]
+        "organization_id": [
+          "default"
+        ]
       }
     }
   ],
@@ -267,7 +295,9 @@
   },
   "smtpServer": {},
   "eventsEnabled": true,
-  "eventsListeners": ["jboss-logging"],
+  "eventsListeners": [
+    "jboss-logging"
+  ],
   "enabledEventTypes": [
     "LOGIN",
     "LOGIN_ERROR",
@@ -283,4 +313,3 @@
   "adminEventsEnabled": true,
   "adminEventsDetailsEnabled": true
 }
-
