@@ -4,71 +4,40 @@
 version: '3.8'
 
 services:
-  # Development mode for services with hot reload
+  # For development, just override environment and add restart policy
+  # Use the production Dockerfiles which are more robust
   controls:
-    build:
-      context: .
-      dockerfile: services/controls/Dockerfile.dev
-    volumes:
-      - ./services/controls/src:/app/services/controls/src
-      - ./services/shared:/app/services/shared
     environment:
       NODE_ENV: development
+    restart: unless-stopped
 
   frameworks:
-    build:
-      context: .
-      dockerfile: services/frameworks/Dockerfile.dev
-    volumes:
-      - ./services/frameworks/src:/app/services/frameworks/src
-      - ./services/shared:/app/services/shared
     environment:
       NODE_ENV: development
+    restart: unless-stopped
 
   policies:
-    build:
-      context: .
-      dockerfile: services/policies/Dockerfile.dev
-    volumes:
-      - ./services/policies/src:/app/services/policies/src
-      - ./services/shared:/app/services/shared
     environment:
       NODE_ENV: development
+    restart: unless-stopped
 
   tprm:
-    build:
-      context: .
-      dockerfile: services/tprm/Dockerfile.dev
-    volumes:
-      - ./services/tprm/src:/app/services/tprm/src
-      - ./services/shared:/app/services/shared
     environment:
       NODE_ENV: development
+    restart: unless-stopped
 
   trust:
-    build:
-      context: .
-      dockerfile: services/trust/Dockerfile.dev
-    volumes:
-      - ./services/trust/src:/app/services/trust/src
-      - ./services/shared:/app/services/shared
     environment:
       NODE_ENV: development
+    restart: unless-stopped
 
   audit:
-    build:
-      context: .
-      dockerfile: services/audit/Dockerfile.dev
-    volumes:
-      - ./services/audit/src:/app/services/audit/src
-      - ./services/shared:/app/services/shared
     environment:
       NODE_ENV: development
+    restart: unless-stopped
 
   frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
     environment:
       NODE_ENV: development
       VITE_ENABLE_DEV_AUTH: "true"
+    restart: unless-stopped
