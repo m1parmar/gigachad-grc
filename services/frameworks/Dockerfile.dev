@@ -4,14 +4,24 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Install dependencies
-COPY package*.json ./
+COPY services/shared/package*.json ./services/shared/
+WORKDIR /app/services/shared
 RUN npm install
 
-# Copy source
-COPY . .
+COPY services/frameworks/package*.json ./services/frameworks/
+WORKDIR /app/services/frameworks
+RUN npm install
+
+# Copy source code
+WORKDIR /app
+COPY services/shared ./services/shared
+COPY services/frameworks ./services/frameworks
 
 # Generate Prisma client
-RUN npm run prisma:generate || true
+WORKDIR /app/services/frameworks
+RUN npx prisma generate --schema=../shared/prisma/schema.prisma || true
+
+WORKDIR /app/services/frameworks
 
 EXPOSE 3002
 
