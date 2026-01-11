@@ -84,7 +84,7 @@ export default function AuditRequestDetail() {
 
     useEffect(() => {
         fetchAudits();
-        if (!isNew) {
+        if (id && !isNew) {
             fetchRequest();
         }
     }, [id, isNew]);
