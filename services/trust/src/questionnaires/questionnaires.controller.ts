@@ -21,14 +21,14 @@ import { UpdateQuestionDto } from './dto/update-question.dto';
 import { CurrentUser, UserContext } from '@gigachad-grc/shared';
 import { DevAuthGuard } from '../auth/dev-auth.guard';
 
-@Controller('questionnaires')
+@Controller('api/questionnaires')
 @UseGuards(DevAuthGuard)
 export class QuestionnairesController {
   constructor(
     private readonly questionnairesService: QuestionnairesService,
     private readonly similarQuestionsService: SimilarQuestionsService,
     private readonly exportService: QuestionnaireExportService,
-  ) {}
+  ) { }
 
   @Post()
   create(
@@ -183,7 +183,7 @@ export class QuestionnairesController {
     };
 
     const result = await this.exportService.exportQuestionnaire(id, options);
-    
+
     // Get questionnaire for filename
     const questionnaire = await this.questionnairesService.findOne(id);
     const filename = `${questionnaire.title.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}`;
@@ -213,7 +213,7 @@ export class QuestionnairesController {
     @Res() res: Response,
   ) {
     const result = await this.exportService.exportMultiple(body.ids, { format: body.format });
-    
+
     const filename = `questionnaires_export_${new Date().toISOString().split('T')[0]}`;
 
     if (body.format === 'excel') {

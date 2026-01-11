@@ -27,7 +27,7 @@ export class ReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
-  ) {}
+  ) { }
 
   /**
    * Generate a compliance report PDF
@@ -169,12 +169,12 @@ export class ReportsService {
       const implementations = fw.mappings
         .map((m) => m.control.implementations[0]?.status)
         .filter(Boolean);
-      
+
       const total = implementations.length;
       const implemented = implementations.filter(
         (s) => s === ControlImplementationStatus.implemented,
       ).length;
-      
+
       return {
         name: fw.name,
         score: total > 0 ? Math.round((implemented / total) * 100) : 0,
@@ -347,7 +347,7 @@ export class ReportsService {
       const implementations = req.mappings
         .map((m) => m.control.implementations[0]?.status)
         .filter(Boolean);
-      
+
       const mappedControls = req.mappings.length;
       const implementedControls = implementations.filter(
         (s) => s === ControlImplementationStatus.implemented,
@@ -555,7 +555,7 @@ export class ReportsService {
         (SELECT COUNT(*) FROM bcdr.process_dependencies WHERE dependent_process_id = bp.id) as dependency_count,
         (SELECT COUNT(*) FROM bcdr.process_assets WHERE process_id = bp.id) as asset_count
       FROM bcdr.business_processes bp
-      LEFT JOIN shared.users u ON bp.owner_id = u.id
+      LEFT JOIN public.users u ON bp.owner_id = u.id
       WHERE bp.organization_id = ${organizationId}::uuid
         AND bp.deleted_at IS NULL
         AND bp.is_active = true
@@ -604,7 +604,7 @@ export class ReportsService {
         bp.title as plan_title,
         (SELECT COUNT(*) FROM bcdr.dr_test_findings WHERE test_id = t.id) as finding_count
       FROM bcdr.dr_tests t
-      LEFT JOIN shared.users u ON t.coordinator_id = u.id
+      LEFT JOIN public.users u ON t.coordinator_id = u.id
       LEFT JOIN bcdr.bcdr_plans bp ON t.plan_id = bp.id
       WHERE t.organization_id = ${organizationId}::uuid
         AND t.deleted_at IS NULL
@@ -616,7 +616,7 @@ export class ReportsService {
 
     // Get findings for each test
     const testIds = tests.map(t => t.id);
-    const findings = testIds.length > 0 
+    const findings = testIds.length > 0
       ? await this.prisma.$queryRaw<any[]>`
           SELECT 
             f.test_id, f.finding_number, f.title, f.severity, f.category,
@@ -646,7 +646,7 @@ export class ReportsService {
         passed: tests.filter(t => t.result === 'passed').length,
         failed: tests.filter(t => t.result === 'failed').length,
         passedWithIssues: tests.filter(t => t.result === 'passed_with_issues').length,
-        avgRecoveryTime: tests.length > 0 
+        avgRecoveryTime: tests.length > 0
           ? Math.round(tests.reduce((sum, t) => sum + (t.actual_recovery_time_minutes || 0), 0) / tests.length)
           : 0,
       },

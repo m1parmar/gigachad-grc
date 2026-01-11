@@ -20,7 +20,7 @@ providers:
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
-    network: grc-network
+    network: gigachad-grc_grc-network
     watch: true
 
 # Health check endpoint

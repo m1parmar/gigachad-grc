@@ -20,7 +20,7 @@ import { UpdateContractDto } from './dto/update-contract.dto';
 import { CurrentUser, UserContext } from '@gigachad-grc/shared';
 import { DevAuthGuard } from '../auth/dev-auth.guard';
 
-@Controller('contracts')
+@Controller('api/contracts')
 @UseGuards(DevAuthGuard)
 export class ContractsController {
   constructor(private readonly contractsService: ContractsService) {}

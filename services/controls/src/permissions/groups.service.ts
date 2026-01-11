@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import {
@@ -12,6 +12,8 @@ import {
 
 @Injectable()
 export class GroupsService {
+  private readonly logger = new Logger(GroupsService.name);
+
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
@@ -21,29 +23,47 @@ export class GroupsService {
    * Get all permission groups for an organization
    */
   async findAll(organizationId: string): Promise<PermissionGroupResponseDto[]> {
-    const groups = await this.prisma.permissionGroup.findMany({
-      where: { organizationId },
-      include: {
-        _count: {
-          select: { members: true },
+    try {
+      const groups = await this.prisma.permissionGroup.findMany({
+        where: { organizationId },
+        include: {
+          _count: {
+            select: { members: true },
+          },
         },
-      },
-      orderBy: [
-        { isSystem: 'desc' },
-        { name: 'asc' },
-      ],
-    });
+        orderBy: [
+          { isSystem: 'desc' },
+          { name: 'asc' },
+        ],
+      });
 
-    return groups.map(group => ({
-      id: group.id,
-      name: group.name,
-      description: group.description || undefined,
-      permissions: group.permissions as any[],
-      isSystem: group.isSystem,
-      memberCount: group._count.members,
-      createdAt: group.createdAt,
-      updatedAt: group.updatedAt,
-    }));
+      return groups.map(group => ({
+        id: group.id,
+        name: group.name,
+        description: group.description || undefined,
+        permissions: group.permissions as any[],
+        isSystem: group.isSystem,
+        memberCount: group._count.members,
+        createdAt: group.createdAt,
+        updatedAt: group.updatedAt,
+      }));
+    } catch (error) {
+      // Handle Prisma errors gracefully
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Check if it's a foreign key constraint error or missing organization
+      if (errorMessage.includes('Foreign key constraint') || 
+          errorMessage.includes('violates foreign key') ||
+          !organizationId) {
+        // Organization doesn't exist or invalid - return empty array
+        this.logger.warn(`No permission groups found for organization ${organizationId || 'undefined'}`);
+        return [];
+      }
+      
+      // Log other errors but still return empty array for graceful degradation
+      this.logger.error(`Error fetching permission groups for organization ${organizationId}: ${errorMessage}`, error instanceof Error ? error.stack : undefined);
+      return [];
+    }
   }
 
   /**

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
+import { cleanFormData } from '../lib/formUtils';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeftIcon, 
-  PencilIcon, 
+import {
+  ArrowLeftIcon,
+  PencilIcon,
   TrashIcon,
   CalendarDaysIcon,
   ExclamationTriangleIcon,
@@ -66,9 +67,10 @@ export default function VendorDetail() {
 
   const handleSave = async (formData: Partial<Vendor>) => {
     try {
+      const cleanedData = cleanFormData(formData);
       const response = id === 'new'
-        ? await vendorsApi.create(formData as any)
-        : await vendorsApi.update(id!, formData as any);
+        ? await vendorsApi.create(cleanedData as any)
+        : await vendorsApi.update(id!, cleanedData as any);
 
       const data = response.data;
       if (id === 'new') {
@@ -413,8 +415,8 @@ function VendorView({ vendor }: { vendor: Vendor }) {
       {nextReviewDue && (
         <div className={clsx(
           'p-4 rounded-lg border flex items-center justify-between',
-          isOverdue 
-            ? 'bg-red-500/10 border-red-500/30' 
+          isOverdue
+            ? 'bg-red-500/10 border-red-500/30'
             : daysUntilReview !== null && daysUntilReview <= 30
               ? 'bg-yellow-500/10 border-yellow-500/30'
               : 'bg-surface-800 border-surface-700'
@@ -433,7 +435,7 @@ function VendorView({ vendor }: { vendor: Vendor }) {
                 'font-medium',
                 isOverdue ? 'text-red-400' : daysUntilReview !== null && daysUntilReview <= 30 ? 'text-yellow-400' : 'text-surface-200'
               )}>
-                {isOverdue 
+                {isOverdue
                   ? `Review Overdue by ${Math.abs(daysUntilReview!)} days`
                   : `Next Review Due: ${nextReviewDue.toLocaleDateString()}`
                 }
@@ -475,9 +477,9 @@ function VendorView({ vendor }: { vendor: Vendor }) {
           <InfoField label="Status" value={vendor.status} capitalize />
           <InfoField label="Website" value={vendor.website} link />
           <InfoField label="Risk Score" value={vendor.inherentRiskScore} capitalize />
-          <InfoField 
-            label="Review Frequency" 
-            value={FREQUENCY_LABELS[extendedVendor.reviewFrequency || 'annual']} 
+          <InfoField
+            label="Review Frequency"
+            value={FREQUENCY_LABELS[extendedVendor.reviewFrequency || 'annual']}
           />
         </div>
       </div>
@@ -506,7 +508,7 @@ function VendorView({ vendor }: { vendor: Vendor }) {
         {extendedVendor.documents && extendedVendor.documents.length > 0 ? (
           <div className="space-y-3">
             {extendedVendor.documents.map((doc) => (
-              <div 
+              <div
                 key={doc.id}
                 className="flex items-center justify-between p-3 bg-surface-800/50 rounded-lg"
               >
@@ -517,17 +519,17 @@ function VendorView({ vendor }: { vendor: Vendor }) {
                     <p className="text-xs text-surface-400">{doc.documentType.replace('_', ' ')}</p>
                   </div>
                 </div>
-                {(doc.documentType.toLowerCase().includes('soc2') || 
+                {(doc.documentType.toLowerCase().includes('soc2') ||
                   doc.documentType.toLowerCase().includes('soc 2')) && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    leftIcon={<SparklesIcon className="w-4 h-4" />}
-                    onClick={() => handleAnalyzeDocument(doc)}
-                  >
-                    Analyze with AI
-                  </Button>
-                )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      leftIcon={<SparklesIcon className="w-4 h-4" />}
+                      onClick={() => handleAnalyzeDocument(doc)}
+                    >
+                      Analyze with AI
+                    </Button>
+                  )}
               </div>
             ))}
           </div>
@@ -546,7 +548,7 @@ function VendorView({ vendor }: { vendor: Vendor }) {
             <h4 className="font-medium text-surface-200">AI-Powered SOC 2 Analysis</h4>
           </div>
           <p className="text-sm text-surface-400 mb-3">
-            Upload a SOC 2 Type II report to automatically extract exceptions, CUECs, 
+            Upload a SOC 2 Type II report to automatically extract exceptions, CUECs,
             and control gaps using AI.
           </p>
           <Button

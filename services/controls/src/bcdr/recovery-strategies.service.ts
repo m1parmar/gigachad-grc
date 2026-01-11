@@ -10,7 +10,7 @@ export class RecoveryStrategiesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
-  ) {}
+  ) { }
 
   async findAll(organizationId: string, filters?: { search?: string; strategyType?: string; processId?: string }) {
     const { search, strategyType, processId } = filters || {};
@@ -57,7 +57,7 @@ export class RecoveryStrategiesService {
     // Get linked assets
     const assets = await this.prisma.$queryRaw<any[]>`
       SELECT id, name, type, status
-      FROM controls.assets
+      FROM public.assets
       WHERE recovery_strategy_id = ${id}::uuid
         AND deleted_at IS NULL
     `;
@@ -274,21 +274,33 @@ export class RecoveryStrategiesService {
   }
 
   async getStats(organizationId: string) {
-    const stats = await this.prisma.$queryRaw<any[]>`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE is_tested = true) as tested_count,
-        COUNT(*) FILTER (WHERE is_tested = false OR is_tested IS NULL) as untested_count,
-        COUNT(*) FILTER (WHERE test_result = 'passed') as passed_count,
-        COUNT(*) FILTER (WHERE test_result = 'failed') as failed_count,
-        AVG(estimated_recovery_time_hours) as avg_recovery_time,
-        COUNT(DISTINCT strategy_type) as strategy_type_count
-      FROM bcdr.recovery_strategies
-      WHERE organization_id = ${organizationId}
-        AND deleted_at IS NULL
-    `;
+    try {
+      if (!organizationId) {
+        return { total: 0, tested_count: 0, untested_count: 0, passed_count: 0, failed_count: 0, avg_recovery_time: null, strategy_type_count: 0 };
+      }
 
-    return stats[0];
+      const stats = await this.prisma.$queryRaw<any[]>`
+        SELECT 
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE is_tested = true) as tested_count,
+          COUNT(*) FILTER (WHERE is_tested = false OR is_tested IS NULL) as untested_count,
+          COUNT(*) FILTER (WHERE test_result = 'passed') as passed_count,
+          COUNT(*) FILTER (WHERE test_result = 'failed') as failed_count,
+          AVG(estimated_recovery_time_hours) as avg_recovery_time,
+          COUNT(DISTINCT strategy_type) as strategy_type_count
+        FROM bcdr.recovery_strategies
+        WHERE organization_id = ${organizationId}
+          AND deleted_at IS NULL
+      `.catch((e) => {
+        this.logger.error(`Error getting recovery strategy stats: ${e.message}`, e.stack);
+        return [{ total: 0, tested_count: 0, untested_count: 0, passed_count: 0, failed_count: 0, avg_recovery_time: null, strategy_type_count: 0 }];
+      });
+
+      return stats[0] || { total: 0, tested_count: 0, untested_count: 0, passed_count: 0, failed_count: 0, avg_recovery_time: null, strategy_type_count: 0 };
+    } catch (error) {
+      this.logger.error(`Failed to get recovery strategy stats for organization ${organizationId}: ${error.message}`, error.stack);
+      return { total: 0, tested_count: 0, untested_count: 0, passed_count: 0, failed_count: 0, avg_recovery_time: null, strategy_type_count: 0 };
+    }
   }
 }
 

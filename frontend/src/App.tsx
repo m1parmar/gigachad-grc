@@ -52,7 +52,7 @@ const KnowledgeBaseDetail = lazy(() => import('./pages/KnowledgeBaseDetail'));
 const TrustCenter = lazy(() => import('./pages/TrustCenter'));
 const TrustCenterSettings = lazy(() => import('./pages/TrustCenterSettings'));
 const Audits = lazy(() => import('./pages/Audits'));
-// AuditDetail will be combined into Audits detail view
+const AuditDetail = lazy(() => import('./pages/AuditDetail'));
 const AuditRequests = lazy(() => import('./pages/AuditRequests'));
 const AuditFindings = lazy(() => import('./pages/AuditFindings'));
 const AuditTemplates = lazy(() => import('./pages/AuditTemplates'));
@@ -128,7 +128,7 @@ interface ModuleRouteProps {
 
 function ModuleRoute({ children, module }: ModuleRouteProps) {
   const { isModuleEnabled } = useModules();
-  
+
   if (!isModuleEnabled(module)) {
     return (
       <Suspense fallback={<PageLoader />}>
@@ -136,7 +136,7 @@ function ModuleRoute({ children, module }: ModuleRouteProps) {
       </Suspense>
     );
   }
-  
+
   return <>{children}</>;
 }
 
@@ -210,14 +210,14 @@ export default function App() {
           <Route path="frameworks/:id" element={<ModuleRoute module="compliance"><Suspense fallback={<PageLoader />}><FrameworkDetail /></Suspense></ModuleRoute>} />
           <Route path="framework-library" element={<ModuleRoute module="compliance"><Suspense fallback={<PageLoader />}><FrameworkLibrary /></Suspense></ModuleRoute>} />
           <Route path="calendar" element={<ModuleRoute module="compliance"><Suspense fallback={<PageLoader />}><ComplianceCalendarPage /></Suspense></ModuleRoute>} />
-          
+
           {/* Data Module */}
           <Route path="policies" element={<ModuleRoute module="data"><Suspense fallback={<PageLoader />}><Policies /></Suspense></ModuleRoute>} />
           <Route path="policies/:id" element={<ModuleRoute module="data"><Suspense fallback={<PageLoader />}><PolicyDetail /></Suspense></ModuleRoute>} />
           <Route path="assets" element={<ModuleRoute module="data"><Suspense fallback={<PageLoader />}><Assets /></Suspense></ModuleRoute>} />
           <Route path="assets/:id" element={<ModuleRoute module="data"><Suspense fallback={<PageLoader />}><AssetDetail /></Suspense></ModuleRoute>} />
           <Route path="integrations" element={<ModuleRoute module="data"><Suspense fallback={<PageLoader />}><Integrations /></Suspense></ModuleRoute>} />
-          
+
           {/* Risk Module */}
           <Route path="risks" element={<ModuleRoute module="risk"><Suspense fallback={<PageLoader />}><Risks /></Suspense></ModuleRoute>} />
           <Route path="risks/:id" element={<ModuleRoute module="risk"><Suspense fallback={<PageLoader />}><RiskDetail /></Suspense></ModuleRoute>} />
@@ -226,7 +226,7 @@ export default function App() {
           <Route path="risk-heatmap" element={<ModuleRoute module="risk"><Suspense fallback={<PageLoader />}><RiskHeatmap /></Suspense></ModuleRoute>} />
           <Route path="risk-scenarios" element={<ModuleRoute module="risk"><Suspense fallback={<PageLoader />}><RiskScenarios /></Suspense></ModuleRoute>} />
           <Route path="risk-reports" element={<ModuleRoute module="risk"><Suspense fallback={<PageLoader />}><RiskReports /></Suspense></ModuleRoute>} />
-          
+
           {/* TPRM Module */}
           <Route path="vendors" element={<ModuleRoute module="tprm"><Suspense fallback={<PageLoader />}><Vendors /></Suspense></ModuleRoute>} />
           <Route path="vendors/:id" element={<ModuleRoute module="tprm"><Suspense fallback={<PageLoader />}><VendorDetail /></Suspense></ModuleRoute>} />
@@ -236,7 +236,7 @@ export default function App() {
           <Route path="contracts/:id" element={<ModuleRoute module="tprm"><Suspense fallback={<PageLoader />}><ContractDetail /></Suspense></ModuleRoute>} />
           <Route path="questionnaires" element={<ModuleRoute module="tprm"><Suspense fallback={<PageLoader />}><Questionnaires /></Suspense></ModuleRoute>} />
           <Route path="questionnaires/:id" element={<ModuleRoute module="tprm"><Suspense fallback={<PageLoader />}><QuestionnaireDetail /></Suspense></ModuleRoute>} />
-          
+
           {/* Trust Module */}
           <Route path="knowledge-base" element={<ModuleRoute module="trust"><Suspense fallback={<PageLoader />}><KnowledgeBase /></Suspense></ModuleRoute>} />
           <Route path="knowledge-base/:id" element={<ModuleRoute module="trust"><Suspense fallback={<PageLoader />}><KnowledgeBaseDetail /></Suspense></ModuleRoute>} />
@@ -244,9 +244,10 @@ export default function App() {
           <Route path="trust-analytics" element={<ModuleRoute module="trust"><Suspense fallback={<PageLoader />}><TrustAnalytics /></Suspense></ModuleRoute>} />
           <Route path="trust-center" element={<ModuleRoute module="trust"><Suspense fallback={<PageLoader />}><TrustCenter /></Suspense></ModuleRoute>} />
           <Route path="trust-center/settings" element={<ModuleRoute module="trust"><Suspense fallback={<PageLoader />}><TrustCenterSettings /></Suspense></ModuleRoute>} />
-          
+
           {/* Audit Module */}
           <Route path="audits" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><Audits /></Suspense></ModuleRoute>} />
+          <Route path="audits/:id" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><AuditDetail /></Suspense></ModuleRoute>} />
           <Route path="audit-requests" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><AuditRequests /></Suspense></ModuleRoute>} />
           <Route path="audit-findings" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><AuditFindings /></Suspense></ModuleRoute>} />
           <Route path="audit-templates" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><AuditTemplates /></Suspense></ModuleRoute>} />
@@ -255,7 +256,7 @@ export default function App() {
           <Route path="audit-calendar" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><AuditCalendar /></Suspense></ModuleRoute>} />
           <Route path="test-procedures" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><TestProcedures /></Suspense></ModuleRoute>} />
           <Route path="audit" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><AuditLog /></Suspense></ModuleRoute>} />
-          
+
           {/* Tools Module */}
           <Route path="scheduled-reports" element={<ModuleRoute module="tools"><Suspense fallback={<PageLoader />}><ScheduledReportsPage /></Suspense></ModuleRoute>} />
           <Route path="tools/ai-risk-assistant" element={<ModuleRoute module="ai"><Suspense fallback={<PageLoader />}><AIRiskAssistant /></Suspense></ModuleRoute>} />
@@ -287,7 +288,7 @@ export default function App() {
           <Route path="people" element={<ModuleRoute module="people"><Suspense fallback={<PageLoader />}><Employees /></Suspense></ModuleRoute>} />
           <Route path="people/dashboard" element={<ModuleRoute module="people"><Suspense fallback={<PageLoader />}><EmployeeComplianceDashboard /></Suspense></ModuleRoute>} />
           <Route path="people/:id" element={<ModuleRoute module="people"><Suspense fallback={<PageLoader />}><EmployeeDetail /></Suspense></ModuleRoute>} />
-          
+
           {/* BC/DR Module */}
           <Route path="bcdr" element={<ModuleRoute module="bcdr"><Suspense fallback={<PageLoader />}><BCDRDashboard /></Suspense></ModuleRoute>} />
           <Route path="bcdr/processes" element={<ModuleRoute module="bcdr"><Suspense fallback={<PageLoader />}><BusinessProcesses /></Suspense></ModuleRoute>} />

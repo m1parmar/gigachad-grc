@@ -9,7 +9,7 @@ import { TrustAiService } from './trust-ai.service';
 import { CurrentUser, UserContext } from '@gigachad-grc/shared';
 import { DevAuthGuard } from '../auth/dev-auth.guard';
 
-@Controller('trust-ai')
+@Controller('api/trust-ai')
 @UseGuards(DevAuthGuard)
 export class TrustAiController {
   constructor(private readonly aiService: TrustAiService) {}

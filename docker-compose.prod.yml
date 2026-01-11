@@ -359,6 +359,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.controls.rule=Host(`${APP_DOMAIN}`) && PathPrefix(`/api/controls`)"
       - "traefik.http.routers.controls-evidence.rule=Host(`${APP_DOMAIN}`) && PathPrefix(`/api/evidence`)"
+      - "traefik.http.routers.controls-risks.rule=Host(`${APP_DOMAIN}`) && PathPrefix(`/api/risks`)"
       - "traefik.http.routers.controls.entrypoints=websecure"
       - "traefik.http.routers.controls.tls.certresolver=letsencrypt"
       - "traefik.http.services.controls.loadbalancer.server.port=3001"
@@ -441,7 +442,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.frameworks.rule=Host(`${APP_DOMAIN}`) && PathPrefix(`/api/frameworks`)"
-      - "traefik.http.routers.frameworks-risks.rule=Host(`${APP_DOMAIN}`) && PathPrefix(`/api/risks`)"
+
       - "traefik.http.routers.frameworks.entrypoints=websecure"
       - "traefik.http.routers.frameworks.tls.certresolver=letsencrypt"
       - "traefik.http.services.frameworks.loadbalancer.server.port=3002"

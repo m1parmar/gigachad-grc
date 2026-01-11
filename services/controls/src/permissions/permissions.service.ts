@@ -106,87 +106,137 @@ export class PermissionsService {
    * Get all effective permissions for a user (merged from groups + overrides)
    */
   async getEffectivePermissions(userId: string): Promise<EffectivePermissionDto[]> {
-    // Get user's group memberships with permissions
-    const memberships = await this.prisma.userGroupMembership.findMany({
-      where: { userId },
-      include: {
-        group: true,
-      },
-    });
+    try {
+      // Verify user exists first
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      });
 
-    // Get user's permission overrides
-    const overrides = await this.prisma.userPermissionOverride.findMany({
-      where: { userId },
-    });
+      if (!user) {
+        this.logger.warn(`User ${userId} not found when fetching effective permissions`);
+        return [];
+      }
 
-    // Build effective permissions map
-    const permissionMap = new Map<string, EffectivePermissionDto>();
+      // Get user's group memberships with permissions
+      const memberships = await this.prisma.userGroupMembership.findMany({
+        where: { userId },
+        include: {
+          group: {
+            select: {
+              id: true,
+              name: true,
+              permissions: true,
+            },
+          },
+        },
+      });
 
-    // First, add all group permissions
-    for (const membership of memberships) {
-      const groupPermissions = (membership.group.permissions as unknown) as PermissionDto[];
-      
-      for (const perm of groupPermissions) {
-        const key = perm.resource;
-        const existing = permissionMap.get(key);
-        
-        if (existing) {
-          // Merge actions (union)
-          const mergedActions = [...new Set([...existing.actions, ...perm.actions])];
-          existing.actions = mergedActions as Action[];
-          // Merge scope (most permissive)
-          existing.scope = this.mergeScopes(existing.scope, perm.scope || {});
-        } else {
-          permissionMap.set(key, {
-            resource: perm.resource,
-            actions: [...perm.actions],
-            scope: perm.scope || { ownership: OwnershipScope.ALL },
-            source: 'group',
-            groupName: membership.group.name,
-          });
+      // Get user's permission overrides
+      const overrides = await this.prisma.userPermissionOverride.findMany({
+        where: { userId },
+      });
+
+      // Build effective permissions map
+      const permissionMap = new Map<string, EffectivePermissionDto>();
+
+      // First, add all group permissions
+      for (const membership of memberships) {
+        if (!membership.group) {
+          this.logger.warn(`Membership ${membership.id} has null group`);
+          continue;
+        }
+
+        try {
+          const groupPermissions = (membership.group.permissions as unknown) as PermissionDto[];
+          
+          if (!Array.isArray(groupPermissions)) {
+            this.logger.warn(`Group ${membership.group.id} has invalid permissions format`);
+            continue;
+          }
+          
+          for (const perm of groupPermissions) {
+            if (!perm || !perm.resource || !perm.actions) {
+              continue;
+            }
+            
+            const key = perm.resource;
+            const existing = permissionMap.get(key);
+            
+            if (existing) {
+              // Merge actions (union)
+              const mergedActions = [...new Set([...existing.actions, ...perm.actions])];
+              existing.actions = mergedActions as Action[];
+              // Merge scope (most permissive)
+              existing.scope = this.mergeScopes(existing.scope, perm.scope || {});
+            } else {
+              permissionMap.set(key, {
+                resource: perm.resource,
+                actions: [...perm.actions],
+                scope: perm.scope || { ownership: OwnershipScope.ALL },
+                source: 'group',
+                groupName: membership.group.name,
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error(`Error processing group ${membership.group.id} permissions:`, error);
+          continue;
         }
       }
-    }
 
-    // Then, apply overrides
-    for (const override of overrides) {
-      const [resource, action] = override.permission.split(':') as [Resource, Action];
-      
-      if (!resource || !action) continue;
+      // Then, apply overrides
+      for (const override of overrides) {
+        try {
+          const [resource, action] = override.permission.split(':') as [Resource, Action];
+          
+          if (!resource || !action) {
+            this.logger.warn(`Invalid permission override format: ${override.permission}`);
+            continue;
+          }
 
-      const existing = permissionMap.get(resource);
-      
-      if (override.granted) {
-        // Grant permission
-        if (existing) {
-          if (!existing.actions.includes(action)) {
-            existing.actions.push(action);
+          const existing = permissionMap.get(resource);
+          
+          if (override.granted) {
+            // Grant permission
+            if (existing) {
+              if (!existing.actions.includes(action)) {
+                existing.actions.push(action);
+              }
+              // Override scope if specified
+              if (override.resourceScope) {
+                existing.scope = override.resourceScope as PermissionScopeDto;
+              }
+              existing.source = 'override';
+            } else {
+              permissionMap.set(resource, {
+                resource,
+                actions: [action],
+                scope: (override.resourceScope as PermissionScopeDto) || { ownership: OwnershipScope.ALL },
+                source: 'override',
+              });
+            }
+          } else {
+            // Deny permission (remove action)
+            if (existing) {
+              existing.actions = existing.actions.filter(a => a !== action);
+              if (existing.actions.length === 0) {
+                permissionMap.delete(resource);
+              }
+            }
           }
-          // Override scope if specified
-          if (override.resourceScope) {
-            existing.scope = override.resourceScope as PermissionScopeDto;
-          }
-          existing.source = 'override';
-        } else {
-          permissionMap.set(resource, {
-            resource,
-            actions: [action],
-            scope: (override.resourceScope as PermissionScopeDto) || { ownership: OwnershipScope.ALL },
-            source: 'override',
-          });
-        }
-      } else {
-        // Deny permission (remove action)
-        if (existing) {
-          existing.actions = existing.actions.filter(a => a !== action);
-          if (existing.actions.length === 0) {
-            permissionMap.delete(resource);
-          }
+        } catch (error) {
+          this.logger.error(`Error processing override ${override.id}:`, error);
+          continue;
         }
       }
-    }
 
-    return Array.from(permissionMap.values());
+      return Array.from(permissionMap.values());
+    } catch (error) {
+      this.logger.error(`Error getting effective permissions for user ${userId}:`, error);
+      // Return empty array instead of throwing - allows the request to continue
+      return [];
+    }
   }
 
   /**

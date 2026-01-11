@@ -12,7 +12,7 @@ import {
 @ApiTags('Audit Templates')
 @ApiBearerAuth()
 @UseGuards(DevAuthGuard)
-@Controller('templates')
+@Controller('api/audit/templates')
 export class TemplatesController {
   constructor(private readonly templatesService: TemplatesService) {}
 

@@ -13,7 +13,7 @@ import { TemplatesService, CreateTemplateDto, UpdateTemplateDto } from './templa
 import { CurrentUser, UserContext } from '@gigachad-grc/shared';
 import { DevAuthGuard } from '../auth/dev-auth.guard';
 
-@Controller('answer-templates')
+@Controller('api/answer-templates')
 @UseGuards(DevAuthGuard)
 export class TemplatesController {
   constructor(private readonly templatesService: TemplatesService) {}

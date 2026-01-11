@@ -2,7 +2,8 @@ import { IsString, IsOptional, IsEmail, IsIn } from 'class-validator';
 
 export class CreateVendorDto {
   @IsString()
-  organizationId: string;
+  @IsOptional()
+  organizationId?: string;
 
   @IsString()
   vendorId: string;

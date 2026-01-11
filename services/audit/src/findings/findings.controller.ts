@@ -13,7 +13,7 @@ import { FindingsService } from './findings.service';
 import { CreateFindingDto } from './dto/create-finding.dto';
 import { UpdateFindingDto } from './dto/update-finding.dto';
 
-@Controller('findings')
+@Controller('api/findings')
 export class FindingsController {
   constructor(private readonly findingsService: FindingsService) {}
 

@@ -12,29 +12,42 @@ export class RunbooksService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
-  ) {}
+  ) { }
 
   async findAll(organizationId: string, filters?: { search?: string; category?: string; status?: RunbookStatus; processId?: string }) {
-    const { search, category, status, processId } = filters || {};
+    try {
+      if (!organizationId) {
+        this.logger.warn('findAll called without organizationId');
+        return [];
+      }
 
-    const runbooks = await this.prisma.$queryRaw<any[]>`
-      SELECT r.*, 
-             u.display_name as owner_name,
-             bp.name as process_name,
-             (SELECT COUNT(*) FROM bcdr.runbook_steps WHERE runbook_id = r.id) as step_count
-      FROM bcdr.runbooks r
-      LEFT JOIN shared.users u ON r.owner_id = u.id
-      LEFT JOIN bcdr.business_processes bp ON r.process_id = bp.id
-      WHERE r.organization_id = ${organizationId}
-        AND r.deleted_at IS NULL
-        ${search ? this.prisma.$queryRaw`AND (r.title ILIKE ${'%' + search + '%'} OR r.runbook_id ILIKE ${'%' + search + '%'})` : this.prisma.$queryRaw``}
-        ${category ? this.prisma.$queryRaw`AND r.category = ${category}` : this.prisma.$queryRaw``}
-        ${status ? this.prisma.$queryRaw`AND r.status = ${status}::bcdr.runbook_status` : this.prisma.$queryRaw``}
-        ${processId ? this.prisma.$queryRaw`AND r.process_id = ${processId}::uuid` : this.prisma.$queryRaw``}
-      ORDER BY r.title ASC
-    `;
+      const { search, category, status, processId } = filters || {};
 
-    return runbooks;
+      const runbooks = await this.prisma.$queryRaw<any[]>`
+        SELECT r.*, 
+               u.display_name as owner_name,
+               bp.name as process_name,
+               (SELECT COUNT(*) FROM bcdr.runbook_steps WHERE runbook_id = r.id) as step_count
+        FROM bcdr.runbooks r
+        LEFT JOIN public.users u ON r.owner_id = u.id
+        LEFT JOIN bcdr.business_processes bp ON r.process_id = bp.id
+        WHERE r.organization_id = ${organizationId}
+          AND r.deleted_at IS NULL
+          ${search ? this.prisma.$queryRaw`AND (r.title ILIKE ${'%' + search + '%'} OR r.runbook_id ILIKE ${'%' + search + '%'})` : this.prisma.$queryRaw``}
+          ${category ? this.prisma.$queryRaw`AND r.category = ${category}` : this.prisma.$queryRaw``}
+          ${status ? this.prisma.$queryRaw`AND r.status = ${status}::bcdr.runbook_status` : this.prisma.$queryRaw``}
+          ${processId ? this.prisma.$queryRaw`AND r.process_id = ${processId}::uuid` : this.prisma.$queryRaw``}
+        ORDER BY r.title ASC
+      `.catch((e) => {
+        this.logger.error(`Error querying runbooks: ${e.message}`, e.stack);
+        return [];
+      });
+
+      return Array.isArray(runbooks) ? runbooks : [];
+    } catch (error) {
+      this.logger.error(`Failed to find runbooks for organization ${organizationId}: ${error.message}`, error.stack);
+      return [];
+    }
   }
 
   async findOne(id: string, organizationId: string) {
@@ -44,7 +57,7 @@ export class RunbooksService {
              bp.name as process_name,
              rs.name as strategy_name
       FROM bcdr.runbooks r
-      LEFT JOIN shared.users u ON r.owner_id = u.id
+      LEFT JOIN public.users u ON r.owner_id = u.id
       LEFT JOIN bcdr.business_processes bp ON r.process_id = bp.id
       LEFT JOIN bcdr.recovery_strategies rs ON r.recovery_strategy_id = rs.id
       WHERE r.id = ${id}::uuid
@@ -384,19 +397,32 @@ export class RunbooksService {
   }
 
   async getStats(organizationId: string) {
-    const stats = await this.prisma.$queryRaw<any[]>`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status = 'published') as published_count,
-        COUNT(*) FILTER (WHERE status = 'draft') as draft_count,
-        COUNT(*) FILTER (WHERE status = 'needs_review') as needs_review_count,
-        COUNT(DISTINCT category) as category_count
-      FROM bcdr.runbooks
-      WHERE organization_id = ${organizationId}
-        AND deleted_at IS NULL
-    `;
+    try {
+      if (!organizationId) {
+        return { total: 0, published_count: 0, draft_count: 0, needs_review_count: 0, category_count: 0, active: 0 };
+      }
 
-    return stats[0];
+      const stats = await this.prisma.$queryRaw<any[]>`
+        SELECT 
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE status = 'published') as published_count,
+          COUNT(*) FILTER (WHERE status = 'draft') as draft_count,
+          COUNT(*) FILTER (WHERE status = 'needs_review') as needs_review_count,
+          COUNT(DISTINCT category) as category_count,
+          COUNT(*) FILTER (WHERE status = 'published') as active
+        FROM bcdr.runbooks
+        WHERE organization_id = ${organizationId}
+          AND deleted_at IS NULL
+      `.catch((e) => {
+        this.logger.error(`Error getting runbook stats: ${e.message}`, e.stack);
+        return [{ total: 0, published_count: 0, draft_count: 0, needs_review_count: 0, category_count: 0, active: 0 }];
+      });
+
+      return stats[0] || { total: 0, published_count: 0, draft_count: 0, needs_review_count: 0, category_count: 0, active: 0 };
+    } catch (error) {
+      this.logger.error(`Failed to get runbook stats for organization ${organizationId}: ${error.message}`, error.stack);
+      return { total: 0, published_count: 0, draft_count: 0, needs_review_count: 0, category_count: 0, active: 0 };
+    }
   }
 }
 

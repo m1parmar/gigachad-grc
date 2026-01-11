@@ -7,7 +7,7 @@ import { DevAuthGuard } from '../auth/dev-auth.guard';
 @ApiTags('Audit Reports')
 @ApiBearerAuth()
 @UseGuards(DevAuthGuard)
-@Controller('reports')
+@Controller('api/audit/reports')
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 

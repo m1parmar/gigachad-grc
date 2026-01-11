@@ -6,7 +6,7 @@ import { DevAuthGuard } from '../auth/dev-auth.guard';
 @ApiTags('Test Procedures')
 @ApiBearerAuth()
 @UseGuards(DevAuthGuard)
-@Controller('test-procedures')
+@Controller('api/audit/test-procedures')
 export class TestProceduresController {
   constructor(private readonly testProceduresService: TestProceduresService) {}
 

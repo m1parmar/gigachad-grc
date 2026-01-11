@@ -2,7 +2,8 @@ import { IsString, IsOptional, IsBoolean, IsArray, IsDateString, IsEnum } from '
 
 export class CreateAuditDto {
   @IsString()
-  organizationId: string;
+  @IsOptional()
+  organizationId?: string;
 
   @IsString()
   @IsOptional()

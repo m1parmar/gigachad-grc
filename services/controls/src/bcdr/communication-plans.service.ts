@@ -13,23 +13,36 @@ export class CommunicationPlansService {
   ) {}
 
   async findAll(organizationId: string, filters?: { search?: string; planType?: string; bcdrPlanId?: string }) {
-    const { search, planType, bcdrPlanId } = filters || {};
+    try {
+      if (!organizationId) {
+        this.logger.warn('findAll called without organizationId');
+        return [];
+      }
 
-    const plans = await this.prisma.$queryRaw<any[]>`
-      SELECT cp.*, 
-             bp.title as bcdr_plan_title,
-             (SELECT COUNT(*) FROM bcdr.communication_contacts WHERE communication_plan_id = cp.id) as contact_count
-      FROM bcdr.communication_plans cp
-      LEFT JOIN bcdr.bcdr_plans bp ON cp.bcdr_plan_id = bp.id
-      WHERE cp.organization_id = ${organizationId}
-        AND cp.deleted_at IS NULL
-        ${search ? this.prisma.$queryRaw`AND cp.name ILIKE ${'%' + search + '%'}` : this.prisma.$queryRaw``}
-        ${planType ? this.prisma.$queryRaw`AND cp.plan_type = ${planType}` : this.prisma.$queryRaw``}
-        ${bcdrPlanId ? this.prisma.$queryRaw`AND cp.bcdr_plan_id = ${bcdrPlanId}::uuid` : this.prisma.$queryRaw``}
-      ORDER BY cp.name ASC
-    `;
+      const { search, planType, bcdrPlanId } = filters || {};
 
-    return plans;
+      const plans = await this.prisma.$queryRaw<any[]>`
+        SELECT cp.*, 
+               bp.title as bcdr_plan_title,
+               (SELECT COUNT(*) FROM bcdr.communication_contacts WHERE communication_plan_id = cp.id) as contact_count
+        FROM bcdr.communication_plans cp
+        LEFT JOIN bcdr.bcdr_plans bp ON cp.bcdr_plan_id = bp.id
+        WHERE cp.organization_id = ${organizationId}
+          AND cp.deleted_at IS NULL
+          ${search ? this.prisma.$queryRaw`AND cp.name ILIKE ${'%' + search + '%'}` : this.prisma.$queryRaw``}
+          ${planType ? this.prisma.$queryRaw`AND cp.plan_type = ${planType}` : this.prisma.$queryRaw``}
+          ${bcdrPlanId ? this.prisma.$queryRaw`AND cp.bcdr_plan_id = ${bcdrPlanId}::uuid` : this.prisma.$queryRaw``}
+        ORDER BY cp.name ASC
+      `.catch((e) => {
+        this.logger.error(`Error querying communication plans: ${e.message}`, e.stack);
+        return [];
+      });
+
+      return Array.isArray(plans) ? plans : [];
+    } catch (error) {
+      this.logger.error(`Failed to find communication plans for organization ${organizationId}: ${error.message}`, error.stack);
+      return [];
+    }
   }
 
   async findOne(id: string, organizationId: string) {

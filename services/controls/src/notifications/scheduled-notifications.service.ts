@@ -46,7 +46,7 @@ export class ScheduledNotificationsService implements OnModuleInit {
     private readonly notificationsService: NotificationsService,
     @InjectMetric('scheduled_notifications_runs_total')
     private readonly notificationRunsCounter: Counter<string>,
-  ) {}
+  ) { }
 
   onModuleInit() {
     // Run daily at 8 AM (or when service starts)
@@ -416,7 +416,7 @@ export class ScheduledNotificationsService implements OnModuleInit {
         SELECT t.id, t.test_id, t.name, t.scheduled_date,
                u.id as coordinator_id, u.email as coordinator_email, u.display_name as coordinator_name
         FROM bcdr.dr_tests t
-        LEFT JOIN shared.users u ON t.coordinator_id = u.id
+        LEFT JOIN public.users u ON t.coordinator_id = u.id
         WHERE t.organization_id = ${organizationId}::uuid
           AND t.deleted_at IS NULL
           AND t.status IN ('planned', 'scheduled')
@@ -449,7 +449,7 @@ export class ScheduledNotificationsService implements OnModuleInit {
         SELECT p.id, p.plan_id, p.title, p.next_review_due,
                u.id as owner_id, u.email as owner_email, u.display_name as owner_name
         FROM bcdr.bcdr_plans p
-        LEFT JOIN shared.users u ON p.owner_id = u.id
+        LEFT JOIN public.users u ON p.owner_id = u.id
         WHERE p.organization_id = ${organizationId}::uuid
           AND p.deleted_at IS NULL
           AND p.status = 'published'
@@ -481,7 +481,7 @@ export class ScheduledNotificationsService implements OnModuleInit {
         SELECT p.id, p.process_id, p.name, p.next_review_due,
                u.id as owner_id, u.email as owner_email, u.display_name as owner_name
         FROM bcdr.business_processes p
-        LEFT JOIN shared.users u ON p.owner_id = u.id
+        LEFT JOIN public.users u ON p.owner_id = u.id
         WHERE p.organization_id = ${organizationId}::uuid
           AND p.deleted_at IS NULL
           AND p.is_active = true
@@ -544,11 +544,11 @@ export class ScheduledNotificationsService implements OnModuleInit {
     const dueSoon = items.filter(i => i.dueDate >= now);
 
     // Get user info
-    const user = userId !== 'unassigned' 
+    const user = userId !== 'unassigned'
       ? await this.prisma.user.findUnique({
-          where: { id: userId },
-          select: { email: true, displayName: true },
-        })
+        where: { id: userId },
+        select: { email: true, displayName: true },
+      })
       : null;
 
     // Send in-app notifications

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { CreateKnowledgeBaseDto } from './dto/create-knowledge-base.dto';
@@ -7,6 +7,8 @@ import { KnowledgeBaseStatus } from '@prisma/client';
 
 @Injectable()
 export class KnowledgeBaseService {
+  private readonly logger = new Logger(KnowledgeBaseService.name);
+
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
@@ -100,44 +102,53 @@ export class KnowledgeBaseService {
   }
 
   async findAll(organizationId: string, filters?: any) {
-    const where: any = { organizationId, deletedAt: null };
+    try {
+      if (!organizationId) {
+        return [];
+      }
 
-    if (filters?.category) {
-      where.category = filters.category;
-    }
-    if (filters?.status) {
-      where.status = filters.status;
-    }
-    if (filters?.framework) {
-      where.framework = filters.framework;
-    }
-    if (filters?.isPublic !== undefined) {
-      where.isPublic = filters.isPublic === 'true';
-    }
-    if (filters?.search) {
-      where.OR = [
-        { title: { contains: filters.search, mode: 'insensitive' } },
-        { question: { contains: filters.search, mode: 'insensitive' } },
-        { answer: { contains: filters.search, mode: 'insensitive' } },
-        { tags: { has: filters.search } },
-      ];
-    }
+      const where: any = { organizationId, deletedAt: null };
 
-    return this.prisma.knowledgeBaseEntry.findMany({
-      where,
-      include: {
-        attachments: true,
-        _count: {
-          select: {
-            questions: true,
+      if (filters?.category) {
+        where.category = filters.category;
+      }
+      if (filters?.status) {
+        where.status = filters.status;
+      }
+      if (filters?.framework) {
+        where.framework = filters.framework;
+      }
+      if (filters?.isPublic !== undefined) {
+        where.isPublic = filters.isPublic === 'true';
+      }
+      if (filters?.search) {
+        where.OR = [
+          { title: { contains: filters.search, mode: 'insensitive' } },
+          { question: { contains: filters.search, mode: 'insensitive' } },
+          { answer: { contains: filters.search, mode: 'insensitive' } },
+          { tags: { has: filters.search } },
+        ];
+      }
+
+      return this.prisma.knowledgeBaseEntry.findMany({
+        where,
+        include: {
+          attachments: true,
+          _count: {
+            select: {
+              questions: true,
+            },
           },
         },
-      },
-      orderBy: [
-        { usageCount: 'desc' },
-        { createdAt: 'desc' },
-      ],
-    });
+        orderBy: [
+          { usageCount: 'desc' },
+          { createdAt: 'desc' },
+        ],
+      });
+    } catch (error) {
+      this.logger.error(`Error fetching knowledge base entries for organization ${organizationId}: ${error.message}`, error.stack);
+      return [];
+    }
   }
 
   async findOne(id: string) {

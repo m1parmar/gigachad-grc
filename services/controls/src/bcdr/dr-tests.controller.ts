@@ -61,6 +61,39 @@ export class DRTestsController {
     return this.testsService.getUpcomingTests(user.organizationId, days || 30);
   }
 
+  @Get('new')
+  @ApiOperation({ summary: 'Get template for new DR test' })
+  @ApiResponse({ status: 200, description: 'Template object for creating a new DR test' })
+  async getNewTemplate(@CurrentUser() user: UserContext) {
+    return {
+      id: null,
+      test_id: null,
+      name: '',
+      description: '',
+      test_type: 'tabletop',
+      status: 'planned',
+      result: null,
+      scheduled_date: null,
+      actual_start_at: null,
+      actual_end_at: null,
+      target_rto_minutes: null,
+      actual_recovery_time_minutes: null,
+      coordinator_id: null,
+      coordinator_name: null,
+      coordinator_email: null,
+      bcdr_plan_id: null,
+      plan_title: null,
+      plan_id: null,
+      objectives: '',
+      scope: '',
+      lessons_learned: '',
+      created_at: null,
+      updated_at: null,
+      findings: [],
+      participants: [],
+    };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get DR test details' })
   @ApiParam({ name: 'id', description: 'Test ID' })

@@ -126,11 +126,33 @@ export class CreateRiskDto {
   @IsString()
   description: string;
 
-  @IsEnum(RiskSource)
-  source: RiskSource = RiskSource.EMPLOYEE_REPORTING;
+  @IsOptional()
+  @IsEnum(RiskCategory)
+  category?: RiskCategory;
 
+  @IsOptional()
+  @IsEnum(RiskSource)
+  source?: RiskSource = RiskSource.EMPLOYEE_REPORTING;
+
+  @IsOptional()
   @IsEnum(InitialSeverity)
-  initialSeverity: InitialSeverity = InitialSeverity.MEDIUM;
+  initialSeverity?: InitialSeverity = InitialSeverity.MEDIUM;
+
+  @IsOptional()
+  @IsEnum(Likelihood)
+  likelihood?: Likelihood;
+
+  @IsOptional()
+  @IsEnum(Impact)
+  impact?: Impact;
+
+  @IsOptional()
+  @IsNumber()
+  likelihoodPct?: number;
+
+  @IsOptional()
+  @IsNumber()
+  impactValue?: number;
 
   @IsOptional()
   @IsString()
@@ -599,7 +621,7 @@ export class RiskResponseDto {
   source: string;
   status: string;
   initialSeverity: string;
-  
+
   // Scoring (populated after assessment)
   likelihood?: string;
   impact?: string;
@@ -608,13 +630,13 @@ export class RiskResponseDto {
   likelihoodPct?: number;
   impactValue?: number;
   annualLossExp?: number;
-  
+
   // Treatment
   treatmentPlan?: string;
   treatmentStatus?: string;
   treatmentNotes?: string;
   treatmentDueDate?: Date;
-  
+
   // Assignments
   reporterId?: string;
   reporterName?: string;
@@ -624,12 +646,12 @@ export class RiskResponseDto {
   riskAssessorName?: string;
   riskOwnerId?: string;
   riskOwnerName?: string;
-  
+
   // Review
   reviewFrequency: string;
   lastReviewedAt?: Date;
   nextReviewDue?: Date;
-  
+
   // Metadata
   tags: string[];
   assetCount: number;
@@ -637,7 +659,7 @@ export class RiskResponseDto {
   scenarioCount: number;
   createdAt: Date;
   updatedAt: Date;
-  
+
   // Sub-ticket info
   hasAssessment: boolean;
   hasTreatment: boolean;
@@ -820,7 +842,7 @@ export const IMPACT_VALUES: Record<Impact, number> = {
 
 export function calculateRiskLevel(likelihood: Likelihood, impact: Impact): RiskLevel {
   const score = LIKELIHOOD_VALUES[likelihood] * IMPACT_VALUES[impact];
-  
+
   if (score >= 16) return RiskLevel.VERY_HIGH;
   if (score >= 12) return RiskLevel.HIGH;
   if (score >= 6) return RiskLevel.MEDIUM;
@@ -844,12 +866,12 @@ export function requiresExecutiveApproval(riskLevel: RiskLevel, decision: Treatm
   if (decision === TreatmentDecision.MITIGATE) {
     return false;
   }
-  
+
   // Very High and High risks require executive approval for accept/transfer/avoid
   if (riskLevel === RiskLevel.VERY_HIGH || riskLevel === RiskLevel.HIGH) {
     return true;
   }
-  
+
   // Medium and below don't require executive approval
   return false;
 }
@@ -863,12 +885,12 @@ export function determineTreatmentOutcome(
   if (decision === TreatmentDecision.MITIGATE) {
     return RiskTreatmentStatus.RISK_MITIGATION_IN_PROGRESS;
   }
-  
+
   // Low and Very Low risks auto-accept any decision
   if (riskLevel === RiskLevel.LOW || riskLevel === RiskLevel.VERY_LOW) {
     return RiskTreatmentStatus.RISK_AUTO_ACCEPT;
   }
-  
+
   // Medium risks go directly to final status
   if (riskLevel === RiskLevel.MEDIUM) {
     switch (decision) {
@@ -880,12 +902,12 @@ export function determineTreatmentOutcome(
         return RiskTreatmentStatus.RISK_AVOID;
     }
   }
-  
+
   // High and Very High risks require executive approval first
   if (executiveApproved === undefined) {
     return RiskTreatmentStatus.IDENTIFY_EXECUTIVE_APPROVER;
   }
-  
+
   if (executiveApproved) {
     switch (decision) {
       case TreatmentDecision.ACCEPT:
@@ -896,7 +918,7 @@ export function determineTreatmentOutcome(
         return RiskTreatmentStatus.RISK_AVOID;
     }
   }
-  
+
   // Executive denied - go back to treatment decision review
   return RiskTreatmentStatus.TREATMENT_DECISION_REVIEW;
 }

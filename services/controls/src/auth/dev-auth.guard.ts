@@ -39,7 +39,7 @@ export class DevAuthGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    
+
     // Mock user context for development
     const mockUser: UserContext = {
       userId: '8f88a42b-e799-455c-b68a-308d7d2e9aa4', // John Doe from seeded users
@@ -48,35 +48,85 @@ export class DevAuthGuard implements CanActivate {
       organizationId: '8924f0c1-7bb1-4be8-84ee-ad8725c712bf', // Default org UUID
       role: 'admin',
       permissions: [
+        // Controls
         'controls:read',
         'controls:write',
+        'controls:create',
+        'controls:update',
         'controls:delete',
+        // Evidence
         'evidence:read',
         'evidence:write',
+        'evidence:create',
+        'evidence:update',
         'evidence:delete',
+        // Frameworks
         'frameworks:read',
         'frameworks:write',
+        'frameworks:create',
+        'frameworks:update',
+        'frameworks:delete',
+        // Policies
         'policies:read',
         'policies:write',
+        'policies:create',
+        'policies:update',
+        'policies:delete',
+        // Integrations
         'integrations:read',
         'integrations:write',
+        'integrations:create',
+        'integrations:update',
+        'integrations:delete',
+        // Users
         'users:read',
         'users:write',
+        'users:create',
+        'users:update',
+        'users:delete',
+        // Settings
         'settings:read',
         'settings:update',
         'settings:write',
+        // Audit
         'audit:read',
+        'audit_logs:read',
+        'audit_logs:export',
+        // Workspaces
         'workspaces:read',
         'workspaces:create',
         'workspaces:update',
         'workspaces:delete',
         'workspaces:assign',
+        // Risk
         'risk:read',
         'risk:write',
         'risk:delete',
         'risk:create',
         'risk:update',
+        // Dashboard
         'dashboard:read',
+        // BCDR (Business Continuity / Disaster Recovery)
+        'bcdr:read',
+        'bcdr:write',
+        'bcdr:create',
+        'bcdr:update',
+        'bcdr:delete',
+        // Reports
+        'reports:read',
+        'reports:write',
+        'reports:create',
+        'reports:export',
+        // AI
+        'ai:read',
+        'ai:write',
+        'ai:create',
+        // Permissions
+        'permissions:read',
+        'permissions:write',
+        'permissions:create',
+        'permissions:update',
+        'permissions:delete',
       ],
       // Optional display name for audit/logging
       name: 'John Doe',

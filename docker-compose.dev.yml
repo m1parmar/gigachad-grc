@@ -10,31 +10,44 @@ services:
     environment:
       NODE_ENV: development
       CORS_ORIGINS: "http://localhost:3000,http://localhost:5173,http://35.226.135.159:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.controls.rule=PathPrefix(`/api/controls`)"
+      - "traefik.http.services.controls.loadbalancer.server.port=3001"
     restart: unless-stopped
 
   frameworks:
     environment:
       NODE_ENV: development
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:5173,http://35.226.135.159:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frameworks.rule=PathPrefix(`/api/frameworks`)"
+      - "traefik.http.services.frameworks.loadbalancer.server.port=3002"
     restart: unless-stopped
 
   policies:
     environment:
       NODE_ENV: development
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:5173,http://35.226.135.159:3000"
     restart: unless-stopped
 
   tprm:
     environment:
       NODE_ENV: development
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:5173,http://35.226.135.159:3000"
     restart: unless-stopped
 
   trust:
     environment:
       NODE_ENV: development
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:5173,http://35.226.135.159:3000"
     restart: unless-stopped
 
   audit:
     environment:
       NODE_ENV: development
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:5173,http://35.226.135.159:3000"
     restart: unless-stopped
 
   keycloak:
@@ -48,7 +61,7 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         VITE_KEYCLOAK_URL: "http://35.226.135.159:8080"
-        VITE_API_URL: "http://35.226.135.159:3001"
+        VITE_API_URL: ""
     environment:
       NODE_ENV: development
       VITE_ENABLE_DEV_AUTH: "true"

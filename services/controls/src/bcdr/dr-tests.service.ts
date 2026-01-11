@@ -20,43 +20,59 @@ export class DRTestsService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly notificationsService: NotificationsService,
-  ) {}
+  ) { }
 
   async findAll(organizationId: string, filters: DRTestFilterDto) {
-    const { search, testType, status, planId, page = 1, limit = 25 } = filters;
+    try {
+      if (!organizationId) {
+        this.logger.warn('findAll called without organizationId');
+        return { data: [], total: 0, page: filters?.page || 1, limit: filters?.limit || 25, totalPages: 0 };
+      }
 
-    const tests = await this.prisma.$queryRaw<any[]>`
-      SELECT dt.*, 
-             u.display_name as coordinator_name,
-             bp.title as plan_title,
-             (SELECT COUNT(*) FROM bcdr.dr_test_findings WHERE test_id = dt.id) as finding_count
-      FROM bcdr.dr_tests dt
-      LEFT JOIN shared.users u ON dt.coordinator_id = u.id
-      LEFT JOIN bcdr.bcdr_plans bp ON dt.plan_id = bp.id
-      WHERE dt.organization_id = ${organizationId}
-        AND dt.deleted_at IS NULL
-        ${search ? this.prisma.$queryRaw`AND (dt.name ILIKE ${'%' + search + '%'} OR dt.test_id ILIKE ${'%' + search + '%'})` : this.prisma.$queryRaw``}
-        ${testType ? this.prisma.$queryRaw`AND dt.test_type = ${testType}::bcdr.test_type` : this.prisma.$queryRaw``}
-        ${status ? this.prisma.$queryRaw`AND dt.status = ${status}::bcdr.test_status` : this.prisma.$queryRaw``}
-        ${planId ? this.prisma.$queryRaw`AND dt.plan_id = ${planId}::uuid` : this.prisma.$queryRaw``}
-      ORDER BY dt.scheduled_date DESC NULLS LAST, dt.created_at DESC
-      LIMIT ${limit} OFFSET ${(page - 1) * limit}
-    `;
+      const { search, testType, status, planId, page = 1, limit = 25 } = filters;
 
-    const total = await this.prisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(*) as count
-      FROM bcdr.dr_tests
-      WHERE organization_id = ${organizationId}
-        AND deleted_at IS NULL
-    `;
+      const tests = await this.prisma.$queryRaw<any[]>`
+        SELECT dt.*, 
+               u.display_name as coordinator_name,
+               bp.title as plan_title,
+               (SELECT COUNT(*) FROM bcdr.dr_test_findings WHERE test_id = dt.id) as finding_count
+        FROM bcdr.dr_tests dt
+        LEFT JOIN public.users u ON dt.coordinator_id = u.id
+        LEFT JOIN bcdr.bcdr_plans bp ON dt.plan_id = bp.id
+        WHERE dt.organization_id = ${organizationId}
+          AND dt.deleted_at IS NULL
+          ${search ? this.prisma.$queryRaw`AND (dt.name ILIKE ${'%' + search + '%'} OR dt.test_id ILIKE ${'%' + search + '%'})` : this.prisma.$queryRaw``}
+          ${testType ? this.prisma.$queryRaw`AND dt.test_type = ${testType}::bcdr.test_type` : this.prisma.$queryRaw``}
+          ${status ? this.prisma.$queryRaw`AND dt.status = ${status}::bcdr.test_status` : this.prisma.$queryRaw``}
+          ${planId ? this.prisma.$queryRaw`AND dt.plan_id = ${planId}::uuid` : this.prisma.$queryRaw``}
+        ORDER BY dt.scheduled_date DESC NULLS LAST, dt.created_at DESC
+        LIMIT ${limit} OFFSET ${(page - 1) * limit}
+      `.catch((e) => {
+        this.logger.error(`Error querying DR tests: ${e.message}`, e.stack);
+        return [];
+      });
 
-    return {
-      data: tests,
-      total: Number(total[0]?.count || 0),
-      page,
-      limit,
-      totalPages: Math.ceil(Number(total[0]?.count || 0) / limit),
-    };
+      const total = await this.prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(*) as count
+        FROM bcdr.dr_tests
+        WHERE organization_id = ${organizationId}
+          AND deleted_at IS NULL
+      `.catch((e) => {
+        this.logger.error(`Error counting DR tests: ${e.message}`, e.stack);
+        return [{ count: BigInt(0) }];
+      });
+
+      return {
+        data: Array.isArray(tests) ? tests : [],
+        total: Number(total[0]?.count || 0),
+        page,
+        limit,
+        totalPages: Math.ceil(Number(total[0]?.count || 0) / limit),
+      };
+    } catch (error) {
+      this.logger.error(`Failed to find DR tests for organization ${organizationId}: ${error.message}`, error.stack);
+      return { data: [], total: 0, page: filters?.page || 1, limit: filters?.limit || 25, totalPages: 0 };
+    }
   }
 
   async findOne(id: string, organizationId: string) {
@@ -65,7 +81,7 @@ export class DRTestsService {
              u.display_name as coordinator_name, u.email as coordinator_email,
              bp.title as plan_title
       FROM bcdr.dr_tests dt
-      LEFT JOIN shared.users u ON dt.coordinator_id = u.id
+      LEFT JOIN public.users u ON dt.coordinator_id = u.id
       LEFT JOIN bcdr.bcdr_plans bp ON dt.plan_id = bp.id
       WHERE dt.id = ${id}::uuid
         AND dt.organization_id = ${organizationId}
@@ -82,7 +98,7 @@ export class DRTestsService {
              u.display_name as remediation_owner_name,
              bp.name as affected_process_name
       FROM bcdr.dr_test_findings f
-      LEFT JOIN shared.users u ON f.remediation_owner_id = u.id
+      LEFT JOIN public.users u ON f.remediation_owner_id = u.id
       LEFT JOIN bcdr.business_processes bp ON f.affected_process_id = bp.id
       WHERE f.test_id = ${id}::uuid
       ORDER BY f.finding_number ASC
@@ -99,7 +115,7 @@ export class DRTestsService {
     // Get participants
     const participants = await this.prisma.$queryRaw<any[]>`
       SELECT id, display_name, email
-      FROM shared.users
+      FROM public.users
       WHERE id = ANY(${tests[0].participant_ids || []}::uuid[])
     `;
 
@@ -477,50 +493,77 @@ export class DRTestsService {
   }
 
   async getUpcomingTests(organizationId: string, days: number = 30) {
-    const tests = await this.prisma.$queryRaw<any[]>`
-      SELECT dt.*, bp.title as plan_title
-      FROM bcdr.dr_tests dt
-      LEFT JOIN bcdr.bcdr_plans bp ON dt.plan_id = bp.id
-      WHERE dt.organization_id = ${organizationId}
-        AND dt.deleted_at IS NULL
-        AND dt.status IN ('planned', 'scheduled')
-        AND dt.scheduled_date >= CURRENT_DATE
-        AND dt.scheduled_date <= CURRENT_DATE + ${days}::integer
-      ORDER BY dt.scheduled_date ASC
-    `;
+    try {
+      if (!organizationId) {
+        return [];
+      }
 
-    return tests;
+      const tests = await this.prisma.$queryRaw<any[]>`
+        SELECT dt.*, bp.title as plan_title
+        FROM bcdr.dr_tests dt
+        LEFT JOIN bcdr.bcdr_plans bp ON dt.plan_id = bp.id
+        WHERE dt.organization_id = ${organizationId}
+          AND dt.deleted_at IS NULL
+          AND dt.status IN ('planned', 'scheduled')
+          AND dt.scheduled_date >= CURRENT_DATE
+          AND dt.scheduled_date <= CURRENT_DATE + ${days}::integer
+        ORDER BY dt.scheduled_date ASC
+      `.catch((e) => {
+        this.logger.error(`Error getting upcoming tests: ${e.message}`, e.stack);
+        return [];
+      });
+
+      return Array.isArray(tests) ? tests : [];
+    } catch (error) {
+      this.logger.error(`Failed to get upcoming tests for organization ${organizationId}: ${error.message}`, error.stack);
+      return [];
+    }
   }
 
   async getStats(organizationId: string) {
-    const stats = await this.prisma.$queryRaw<any[]>`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status = 'completed') as completed_count,
-        COUNT(*) FILTER (WHERE status IN ('planned', 'scheduled')) as upcoming_count,
-        COUNT(*) FILTER (WHERE result = 'passed') as passed_count,
-        COUNT(*) FILTER (WHERE result = 'failed') as failed_count,
-        COUNT(*) FILTER (WHERE result = 'passed_with_issues') as issues_count,
-        AVG(actual_recovery_time_minutes) FILTER (WHERE result IS NOT NULL) as avg_recovery_time
-      FROM bcdr.dr_tests
-      WHERE organization_id = ${organizationId}
-        AND deleted_at IS NULL
-    `;
+    try {
+      if (!organizationId) {
+        return { total: 0, completed_count: 0, upcoming_count: 0, passed_count: 0, failed_count: 0, issues_count: 0, avg_recovery_time: null, openFindingsCount: 0 };
+      }
 
-    // Get open findings count
-    const openFindings = await this.prisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(*) as count
-      FROM bcdr.dr_test_findings f
-      JOIN bcdr.dr_tests t ON f.test_id = t.id
-      WHERE t.organization_id = ${organizationId}
-        AND f.remediation_required = true
-        AND f.remediation_status NOT IN ('resolved', 'accepted')
-    `;
+      const stats = await this.prisma.$queryRaw<any[]>`
+        SELECT 
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE status = 'completed') as completed_count,
+          COUNT(*) FILTER (WHERE status IN ('planned', 'scheduled')) as upcoming_count,
+          COUNT(*) FILTER (WHERE result = 'passed') as passed_count,
+          COUNT(*) FILTER (WHERE result = 'failed') as failed_count,
+          COUNT(*) FILTER (WHERE result = 'passed_with_issues') as issues_count,
+          AVG(actual_recovery_time_minutes) FILTER (WHERE result IS NOT NULL) as avg_recovery_time
+        FROM bcdr.dr_tests
+        WHERE organization_id = ${organizationId}
+          AND deleted_at IS NULL
+      `.catch((e) => {
+        this.logger.error(`Error getting DR test stats: ${e.message}`, e.stack);
+        return [{ total: 0, completed_count: 0, upcoming_count: 0, passed_count: 0, failed_count: 0, issues_count: 0, avg_recovery_time: null }];
+      });
 
-    return {
-      ...stats[0],
-      openFindingsCount: Number(openFindings[0]?.count || 0),
-    };
+      // Get open findings count
+      const openFindings = await this.prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(*) as count
+        FROM bcdr.dr_test_findings f
+        JOIN bcdr.dr_tests t ON f.test_id = t.id
+        WHERE t.organization_id = ${organizationId}
+          AND f.remediation_required = true
+          AND f.remediation_status NOT IN ('resolved', 'accepted')
+      `.catch((e) => {
+        this.logger.error(`Error getting open findings count: ${e.message}`, e.stack);
+        return [{ count: BigInt(0) }];
+      });
+
+      return {
+        ...(stats[0] || { total: 0, completed_count: 0, upcoming_count: 0, passed_count: 0, failed_count: 0, issues_count: 0, avg_recovery_time: null }),
+        openFindingsCount: Number(openFindings[0]?.count || 0),
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get DR test stats for organization ${organizationId}: ${error.message}`, error.stack);
+      return { total: 0, completed_count: 0, upcoming_count: 0, passed_count: 0, failed_count: 0, issues_count: 0, avg_recovery_time: null, openFindingsCount: 0 };
+    }
   }
 }
 

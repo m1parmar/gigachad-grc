@@ -18,61 +18,77 @@ export class BCDRPlansService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     @Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider,
-  ) {}
+  ) { }
 
   async findAll(organizationId: string, filters: BCDRPlanFilterDto) {
-    const { search, planType, status, page = 1, limit = 25 } = filters;
+    try {
+      if (!organizationId) {
+        this.logger.warn('findAll called without organizationId');
+        return { data: [], total: 0, page: filters?.page || 1, limit: filters?.limit || 25, totalPages: 0 };
+      }
 
-    const where: any = {
-      organizationId,
-      deletedAt: null,
-    };
+      const { search, planType, status, page = 1, limit = 25 } = filters;
 
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { planId: { contains: search, mode: 'insensitive' } },
-      ];
+      const where: any = {
+        organizationId,
+        deletedAt: null,
+      };
+
+      if (search) {
+        where.OR = [
+          { title: { contains: search, mode: 'insensitive' } },
+          { planId: { contains: search, mode: 'insensitive' } },
+        ];
+      }
+
+      if (planType) {
+        where.planType = planType;
+      }
+
+      if (status) {
+        where.status = status;
+      }
+
+      const [plans, total] = await Promise.all([
+        this.prisma.$queryRaw<any[]>`
+          SELECT bp.*, 
+                 u.display_name as owner_name,
+                 (SELECT COUNT(*) FROM bcdr.plan_controls WHERE plan_id = bp.id) as control_count
+          FROM bcdr.bcdr_plans bp
+          LEFT JOIN public.users u ON bp.owner_id = u.id
+          WHERE bp.organization_id = ${organizationId}
+            AND bp.deleted_at IS NULL
+            ${search ? this.prisma.$queryRaw`AND (bp.title ILIKE ${'%' + search + '%'} OR bp.plan_id ILIKE ${'%' + search + '%'})` : this.prisma.$queryRaw``}
+            ${planType ? this.prisma.$queryRaw`AND bp.plan_type = ${planType}::bcdr.plan_type` : this.prisma.$queryRaw``}
+            ${status ? this.prisma.$queryRaw`AND bp.status = ${status}::bcdr.plan_status` : this.prisma.$queryRaw``}
+          ORDER BY bp.updated_at DESC
+          LIMIT ${limit} OFFSET ${(page - 1) * limit}
+        `.catch((e) => {
+          this.logger.error(`Error querying BCDR plans: ${e.message}`, e.stack);
+          return [];
+        }),
+        this.prisma.$queryRaw<[{ count: bigint }]>`
+          SELECT COUNT(*) as count
+          FROM bcdr.bcdr_plans
+          WHERE organization_id = ${organizationId}
+            AND deleted_at IS NULL
+        `.catch((e) => {
+          this.logger.error(`Error counting BCDR plans: ${e.message}`, e.stack);
+          return [{ count: BigInt(0) }];
+        }),
+      ]);
+
+      return {
+        data: Array.isArray(plans) ? plans : [],
+        total: Number(total[0]?.count || 0),
+        page,
+        limit,
+        totalPages: Math.ceil(Number(total[0]?.count || 0) / limit),
+      };
+    } catch (error) {
+      this.logger.error(`Failed to find BCDR plans for organization ${organizationId}: ${error.message}`, error.stack);
+      return { data: [], total: 0, page: filters?.page || 1, limit: filters?.limit || 25, totalPages: 0 };
     }
-
-    if (planType) {
-      where.planType = planType;
-    }
-
-    if (status) {
-      where.status = status;
-    }
-
-    const [plans, total] = await Promise.all([
-      this.prisma.$queryRaw<any[]>`
-        SELECT bp.*, 
-               u.display_name as owner_name,
-               (SELECT COUNT(*) FROM bcdr.plan_controls WHERE plan_id = bp.id) as control_count
-        FROM bcdr.bcdr_plans bp
-        LEFT JOIN shared.users u ON bp.owner_id = u.id
-        WHERE bp.organization_id = ${organizationId}
-          AND bp.deleted_at IS NULL
-          ${search ? this.prisma.$queryRaw`AND (bp.title ILIKE ${'%' + search + '%'} OR bp.plan_id ILIKE ${'%' + search + '%'})` : this.prisma.$queryRaw``}
-          ${planType ? this.prisma.$queryRaw`AND bp.plan_type = ${planType}::bcdr.plan_type` : this.prisma.$queryRaw``}
-          ${status ? this.prisma.$queryRaw`AND bp.status = ${status}::bcdr.plan_status` : this.prisma.$queryRaw``}
-        ORDER BY bp.updated_at DESC
-        LIMIT ${limit} OFFSET ${(page - 1) * limit}
-      `,
-      this.prisma.$queryRaw<[{ count: bigint }]>`
-        SELECT COUNT(*) as count
-        FROM bcdr.bcdr_plans
-        WHERE organization_id = ${organizationId}
-          AND deleted_at IS NULL
-      `,
-    ]);
-
-    return {
-      data: plans,
-      total: Number(total[0]?.count || 0),
-      page,
-      limit,
-      totalPages: Math.ceil(Number(total[0]?.count || 0) / limit),
-    };
   }
 
   async findOne(id: string, organizationId: string) {
@@ -81,8 +97,8 @@ export class BCDRPlansService {
              u.display_name as owner_name,
              a.display_name as approver_name
       FROM bcdr.bcdr_plans bp
-      LEFT JOIN shared.users u ON bp.owner_id = u.id
-      LEFT JOIN shared.users a ON bp.approver_id = a.id
+      LEFT JOIN public.users u ON bp.owner_id = u.id
+      LEFT JOIN public.users a ON bp.approver_id = a.id
       WHERE bp.id = ${id}::uuid
         AND bp.organization_id = ${organizationId}
         AND bp.deleted_at IS NULL
@@ -96,7 +112,7 @@ export class BCDRPlansService {
     const versions = await this.prisma.$queryRaw<any[]>`
       SELECT pv.*, u.display_name as created_by_name
       FROM bcdr.plan_versions pv
-      LEFT JOIN shared.users u ON pv.created_by = u.id
+      LEFT JOIN public.users u ON pv.created_by = u.id
       WHERE pv.plan_id = ${id}::uuid
       ORDER BY pv.created_at DESC
     `;
@@ -105,7 +121,7 @@ export class BCDRPlansService {
     const controls = await this.prisma.$queryRaw<any[]>`
       SELECT pc.*, c.control_id, c.title, c.category
       FROM bcdr.plan_controls pc
-      JOIN controls.controls c ON pc.control_id = c.id
+      JOIN public.controls c ON pc.control_id = c.id
       WHERE pc.plan_id = ${id}::uuid
     `;
 
@@ -404,21 +420,33 @@ export class BCDRPlansService {
   }
 
   async getStats(organizationId: string) {
-    const stats = await this.prisma.$queryRaw<any[]>`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status = 'draft') as draft_count,
-        COUNT(*) FILTER (WHERE status = 'in_review') as in_review_count,
-        COUNT(*) FILTER (WHERE status = 'approved') as approved_count,
-        COUNT(*) FILTER (WHERE status = 'published') as published_count,
-        COUNT(*) FILTER (WHERE next_review_due < NOW()) as overdue_review_count,
-        COUNT(*) FILTER (WHERE expiry_date < NOW() AND status = 'published') as expired_count
-      FROM bcdr.bcdr_plans
-      WHERE organization_id = ${organizationId}
-        AND deleted_at IS NULL
-    `;
+    try {
+      if (!organizationId) {
+        return { total: 0, draft_count: 0, in_review_count: 0, approved_count: 0, published_count: 0, overdue_review_count: 0, expired_count: 0 };
+      }
 
-    return stats[0];
+      const stats = await this.prisma.$queryRaw<any[]>`
+        SELECT 
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE status = 'draft') as draft_count,
+          COUNT(*) FILTER (WHERE status = 'in_review') as in_review_count,
+          COUNT(*) FILTER (WHERE status = 'approved') as approved_count,
+          COUNT(*) FILTER (WHERE status = 'published') as published_count,
+          COUNT(*) FILTER (WHERE next_review_due < NOW()) as overdue_review_count,
+          COUNT(*) FILTER (WHERE expiry_date < NOW() AND status = 'published') as expired_count
+        FROM bcdr.bcdr_plans
+        WHERE organization_id = ${organizationId}
+          AND deleted_at IS NULL
+      `.catch((e) => {
+        this.logger.error(`Error getting BCDR plan stats: ${e.message}`, e.stack);
+        return [{ total: 0, draft_count: 0, in_review_count: 0, approved_count: 0, published_count: 0, overdue_review_count: 0, expired_count: 0 }];
+      });
+
+      return stats[0] || { total: 0, draft_count: 0, in_review_count: 0, approved_count: 0, published_count: 0, overdue_review_count: 0, expired_count: 0 };
+    } catch (error) {
+      this.logger.error(`Failed to get BCDR plan stats for organization ${organizationId}: ${error.message}`, error.stack);
+      return { total: 0, draft_count: 0, in_review_count: 0, approved_count: 0, published_count: 0, overdue_review_count: 0, expired_count: 0 };
+    }
   }
 }
 

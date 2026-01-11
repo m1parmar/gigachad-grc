@@ -54,6 +54,39 @@ export class BCDRPlansController {
     return this.plansService.getStats(user.organizationId);
   }
 
+  @Get('new')
+  @ApiOperation({ summary: 'Get template for new BC/DR plan' })
+  @ApiResponse({ status: 200, description: 'Template object for creating a new plan' })
+  @RequirePermission(Resource.BCDR, Action.READ)
+  async getNewTemplate(@CurrentUser() user: UserContext) {
+    return {
+      id: null,
+      plan_id: null,
+      title: '',
+      description: '',
+      plan_type: 'business_continuity',
+      status: 'draft',
+      version: '1.0',
+      owner_id: null,
+      owner_name: null,
+      owner_email: null,
+      effective_date: null,
+      next_review_due: null,
+      last_reviewed_at: null,
+      objectives: '',
+      scope: '',
+      assumptions: '',
+      activation_criteria: '',
+      deactivation_criteria: '',
+      created_at: null,
+      updated_at: null,
+      in_scope_processes: [],
+      linked_controls: [],
+      communication_plans: [],
+      dr_tests: [],
+    };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get BC/DR plan details' })
   @ApiParam({ name: 'id', description: 'Plan ID' })

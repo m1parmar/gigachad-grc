@@ -17,56 +17,68 @@ export class BusinessProcessesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
-  ) {}
+  ) { }
 
   async findAll(organizationId: string, filters: BusinessProcessFilterDto) {
-    const { search, criticalityTier, department, ownerId, isActive, page = 1, limit = 25 } = filters;
+    try {
+      if (!organizationId) {
+        this.logger.warn('findAll called without organizationId');
+        return { data: [], total: 0, page: filters?.page || 1, limit: filters?.limit || 25, totalPages: 0 };
+      }
 
-    const where: any = {
-      organizationId,
-      deletedAt: null,
-    };
+      const { search, criticalityTier, department, ownerId, isActive, page = 1, limit = 25 } = filters || {};
+      const offset = (page - 1) * limit;
 
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { processId: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
+      // Build WHERE conditions dynamically using $queryRawUnsafe for complex queries
+      const conditions: string[] = [
+        `bp.organization_id = $1`,
+        `bp.deleted_at IS NULL`,
       ];
-    }
+      const params: any[] = [organizationId];
+      let paramIndex = 2;
 
-    if (criticalityTier) {
-      where.criticalityTier = criticalityTier;
-    }
+      if (search) {
+        conditions.push(`(bp.name ILIKE $${paramIndex} OR bp.process_id ILIKE $${paramIndex})`);
+        params.push(`%${search}%`);
+        paramIndex++;
+      }
 
-    if (department) {
-      where.department = department;
-    }
+      if (criticalityTier) {
+        conditions.push(`bp.criticality_tier = $${paramIndex}::bcdr.criticality_tier`);
+        params.push(criticalityTier);
+        paramIndex++;
+      }
 
-    if (ownerId) {
-      where.ownerId = ownerId;
-    }
+      if (department) {
+        conditions.push(`bp.department = $${paramIndex}`);
+        params.push(department);
+        paramIndex++;
+      }
 
-    if (isActive !== undefined) {
-      where.isActive = isActive;
-    }
+      if (ownerId) {
+        conditions.push(`bp.owner_id = $${paramIndex}::uuid`);
+        params.push(ownerId);
+        paramIndex++;
+      }
 
-    const [processes, total] = await Promise.all([
-      this.prisma.$queryRaw`
+      if (isActive !== undefined) {
+        conditions.push(`bp.is_active = $${paramIndex}`);
+        params.push(isActive);
+        paramIndex++;
+      }
+
+      const whereClause = conditions.join(' AND ');
+
+      // Main query with all filters
+      const processQuery = `
         SELECT bp.*, 
                u.display_name as owner_name, 
                u.email as owner_email,
                (SELECT COUNT(*) FROM bcdr.process_dependencies WHERE dependent_process_id = bp.id) as dependency_count,
                (SELECT COUNT(*) FROM bcdr.process_assets WHERE process_id = bp.id) as asset_count
         FROM bcdr.business_processes bp
-        LEFT JOIN shared.users u ON bp.owner_id = u.id
-        WHERE bp.organization_id = ${organizationId}
-          AND bp.deleted_at IS NULL
-          ${search ? this.prisma.$queryRaw`AND (bp.name ILIKE ${'%' + search + '%'} OR bp.process_id ILIKE ${'%' + search + '%'})` : this.prisma.$queryRaw``}
-          ${criticalityTier ? this.prisma.$queryRaw`AND bp.criticality_tier = ${criticalityTier}` : this.prisma.$queryRaw``}
-          ${department ? this.prisma.$queryRaw`AND bp.department = ${department}` : this.prisma.$queryRaw``}
-          ${ownerId ? this.prisma.$queryRaw`AND bp.owner_id = ${ownerId}::uuid` : this.prisma.$queryRaw``}
-          ${isActive !== undefined ? this.prisma.$queryRaw`AND bp.is_active = ${isActive}` : this.prisma.$queryRaw``}
+        LEFT JOIN public.users u ON bp.owner_id::text = u.id
+        WHERE ${whereClause}
         ORDER BY 
           CASE bp.criticality_tier 
             WHEN 'tier_1_critical' THEN 1 
@@ -75,23 +87,51 @@ export class BusinessProcessesService {
             ELSE 4 
           END,
           bp.name ASC
-        LIMIT ${limit} OFFSET ${(page - 1) * limit}
-      `,
-      this.prisma.$queryRaw<[{ count: bigint }]>`
-        SELECT COUNT(*) as count
-        FROM bcdr.business_processes
-        WHERE organization_id = ${organizationId}
-          AND deleted_at IS NULL
-      `,
-    ]);
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+      params.push(limit, offset);
 
-    return {
-      data: processes,
-      total: Number(total[0]?.count || 0),
-      page,
-      limit,
-      totalPages: Math.ceil(Number(total[0]?.count || 0) / limit),
-    };
+      // Count query with same filters (excluding limit/offset)
+      const countQuery = `
+        SELECT COUNT(*) as count
+        FROM bcdr.business_processes bp
+        WHERE ${whereClause}
+      `;
+      const countParams = params.slice(0, -2); // Remove limit and offset
+
+      const [processes, totalResult] = await Promise.all([
+        this.prisma.$queryRawUnsafe<any[]>(processQuery, ...params).catch((e) => {
+          this.logger.error(`Error querying business processes: ${e.message}`, e.stack);
+          return [];
+        }),
+        this.prisma.$queryRawUnsafe<[{ count: bigint }]>(countQuery, ...countParams).catch((e) => {
+          this.logger.error(`Error counting business processes: ${e.message}`, e.stack);
+          return [{ count: BigInt(0) }];
+        }),
+      ]);
+
+      const total = Number(totalResult[0]?.count || 0);
+
+      // Convert BigInt values to Numbers for JSON serialization
+      const processesWithNumbers = Array.isArray(processes)
+        ? processes.map(p => ({
+          ...p,
+          dependency_count: Number(p.dependency_count || 0),
+          asset_count: Number(p.asset_count || 0),
+        }))
+        : [];
+
+      return {
+        data: processesWithNumbers,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (error) {
+      this.logger.error(`Failed to find business processes for organization ${organizationId}: ${error.message}`, error.stack);
+      return { data: [], total: 0, page: filters?.page || 1, limit: filters?.limit || 25, totalPages: 0 };
+    }
   }
 
   async findOne(id: string, organizationId: string) {
@@ -100,7 +140,7 @@ export class BusinessProcessesService {
              u.display_name as owner_name, 
              u.email as owner_email
       FROM bcdr.business_processes bp
-      LEFT JOIN shared.users u ON bp.owner_id = u.id
+      LEFT JOIN public.users u ON bp.owner_id::text = u.id
       WHERE bp.id = ${id}::uuid
         AND bp.organization_id = ${organizationId}
         AND bp.deleted_at IS NULL
@@ -133,16 +173,16 @@ export class BusinessProcessesService {
       SELECT pa.*, 
              a.name, a.type, a.status
       FROM bcdr.process_assets pa
-      JOIN controls.assets a ON pa.asset_id = a.id
+      JOIN public.assets a ON pa.asset_id::text = a.id
       WHERE pa.process_id = ${id}::uuid
     `;
 
     // Get linked risks
     const risks = await this.prisma.$queryRaw<any[]>`
       SELECT br.*, 
-             r.risk_id, r.title, r.inherent_risk_level
+             r.risk_id, r.title, r.inherent_risk as inherent_risk_level
       FROM bcdr.bia_risks br
-      JOIN controls.risks r ON br.risk_id = r.id
+      JOIN public.risks r ON br.risk_id::text = r.id
       WHERE br.process_id = ${id}::uuid
     `;
 
@@ -528,23 +568,35 @@ export class BusinessProcessesService {
 
   // Summary stats
   async getStats(organizationId: string) {
-    const stats = await this.prisma.$queryRaw<any[]>`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE criticality_tier = 'tier_1_critical') as tier_1_count,
-        COUNT(*) FILTER (WHERE criticality_tier = 'tier_2_essential') as tier_2_count,
-        COUNT(*) FILTER (WHERE criticality_tier = 'tier_3_important') as tier_3_count,
-        COUNT(*) FILTER (WHERE criticality_tier = 'tier_4_standard') as tier_4_count,
-        COUNT(*) FILTER (WHERE next_review_due < NOW()) as overdue_review_count,
-        COUNT(*) FILTER (WHERE is_active = false) as inactive_count,
-        AVG(rto_hours) as avg_rto,
-        AVG(rpo_hours) as avg_rpo
-      FROM bcdr.business_processes
-      WHERE organization_id = ${organizationId}
-        AND deleted_at IS NULL
-    `;
+    try {
+      if (!organizationId) {
+        return { total: 0, tier_1_count: 0, tier_2_count: 0, tier_3_count: 0, tier_4_count: 0, overdue_review_count: 0, inactive_count: 0, avg_rto: null, avg_rpo: null };
+      }
 
-    return stats[0];
+      const stats = await this.prisma.$queryRaw<any[]>`
+        SELECT 
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE criticality_tier = 'tier_1_critical') as tier_1_count,
+          COUNT(*) FILTER (WHERE criticality_tier = 'tier_2_essential') as tier_2_count,
+          COUNT(*) FILTER (WHERE criticality_tier = 'tier_3_important') as tier_3_count,
+          COUNT(*) FILTER (WHERE criticality_tier = 'tier_4_standard') as tier_4_count,
+          COUNT(*) FILTER (WHERE next_review_due < NOW()) as overdue_review_count,
+          COUNT(*) FILTER (WHERE is_active = false) as inactive_count,
+          AVG(rto_hours) as avg_rto,
+          AVG(rpo_hours) as avg_rpo
+        FROM bcdr.business_processes
+        WHERE organization_id = ${organizationId}
+          AND deleted_at IS NULL
+      `.catch((e) => {
+        this.logger.error(`Error getting business process stats: ${e.message}`, e.stack);
+        return [{ total: 0, tier_1_count: 0, tier_2_count: 0, tier_3_count: 0, tier_4_count: 0, overdue_review_count: 0, inactive_count: 0, avg_rto: null, avg_rpo: null }];
+      });
+
+      return stats[0] || { total: 0, tier_1_count: 0, tier_2_count: 0, tier_3_count: 0, tier_4_count: 0, overdue_review_count: 0, inactive_count: 0, avg_rto: null, avg_rpo: null };
+    } catch (error) {
+      this.logger.error(`Failed to get business process stats for organization ${organizationId}: ${error.message}`, error.stack);
+      return { total: 0, tier_1_count: 0, tier_2_count: 0, tier_3_count: 0, tier_4_count: 0, overdue_review_count: 0, inactive_count: 0, avg_rto: null, avg_rpo: null };
+    }
   }
 }
 

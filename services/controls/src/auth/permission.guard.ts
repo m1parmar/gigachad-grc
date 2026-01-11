@@ -74,54 +74,75 @@ export class PermissionGuard implements CanActivate {
     userId: string,
     request: any,
   ): Promise<boolean> {
-    const { resource, action, resourceIdParam } = permission;
+    try {
+      const { resource, action, resourceIdParam } = permission;
 
-    // In dev mode, first check request.user.permissions (set by DevAuthGuard)
-    const nodeEnv = process.env.NODE_ENV || 'development';
-    if (nodeEnv !== 'production' && request.user?.permissions) {
-      const requiredPerm = `${resource}:${action}`;
-      if (request.user.permissions.includes(requiredPerm)) {
-        this.logger.debug(`Permission granted via DevAuthGuard: ${requiredPerm}`);
-        return true;
+      // In dev mode, first check request.user.permissions (set by DevAuthGuard)
+      const nodeEnv = process.env.NODE_ENV || 'development';
+      if (nodeEnv !== 'production' && request.user?.permissions) {
+        const requiredPerm = `${resource}:${action}`;
+        if (request.user.permissions.includes(requiredPerm)) {
+          this.logger.debug(`Permission granted via DevAuthGuard: ${requiredPerm}`);
+          return true;
+        }
       }
-    }
 
-    // Get resource ID if specified
-    let resourceId: string | undefined;
-    if (resourceIdParam) {
-      resourceId = request.params?.[resourceIdParam] || request.body?.[resourceIdParam];
-    }
+      // Get resource ID if specified
+      let resourceId: string | undefined;
+      if (resourceIdParam) {
+        resourceId = request.params?.[resourceIdParam] || request.body?.[resourceIdParam];
+      }
 
-    // Check permission based on resource type
-    let result;
-    if (resourceId) {
-      // Use specific resource check for ownership validation
-      switch (resource) {
-        case Resource.CONTROLS:
-          result = await this.permissionsService.canAccessControl(userId, resourceId, action);
-          break;
-        case Resource.EVIDENCE:
-          result = await this.permissionsService.canAccessEvidence(userId, resourceId, action);
-          break;
-        case Resource.POLICIES:
-          result = await this.permissionsService.canAccessPolicy(userId, resourceId, action);
-          break;
-        default:
+      // Check permission based on resource type
+      let result;
+      try {
+        if (resourceId) {
+          // Use specific resource check for ownership validation
+          switch (resource) {
+            case Resource.CONTROLS:
+              result = await this.permissionsService.canAccessControl(userId, resourceId, action);
+              break;
+            case Resource.EVIDENCE:
+              result = await this.permissionsService.canAccessEvidence(userId, resourceId, action);
+              break;
+            case Resource.POLICIES:
+              result = await this.permissionsService.canAccessPolicy(userId, resourceId, action);
+              break;
+            default:
+              result = await this.permissionsService.hasPermission(userId, resource, action);
+          }
+        } else {
+          // General permission check without resource context
           result = await this.permissionsService.hasPermission(userId, resource, action);
+        }
+      } catch (error) {
+        this.logger.error(
+          `Error checking permission for user ${userId}: ${resource}:${action}`,
+          error,
+        );
+        // In case of database errors, deny access with a clear message
+        throw new ForbiddenException(
+          `Unable to verify permissions. Please contact support if this persists.`,
+        );
       }
-    } else {
-      // General permission check without resource context
-      result = await this.permissionsService.hasPermission(userId, resource, action);
-    }
 
-    if (!result.allowed) {
-      this.logger.debug(
-        `Permission denied for user ${userId}: ${resource}:${action} - ${result.reason}`,
-      );
-      throw new ForbiddenException(result.reason || 'Insufficient permissions');
-    }
+      if (!result.allowed) {
+        this.logger.debug(
+          `Permission denied for user ${userId}: ${resource}:${action} - ${result.reason}`,
+        );
+        throw new ForbiddenException(result.reason || 'Insufficient permissions');
+      }
 
-    return true;
+      return true;
+    } catch (error) {
+      // If it's already a ForbiddenException, re-throw it
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+      // For any other errors, log and throw a generic forbidden error
+      this.logger.error(`Unexpected error in permission check:`, error);
+      throw new ForbiddenException('Unable to verify permissions');
+    }
   }
 }
 

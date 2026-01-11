@@ -61,35 +61,40 @@ export class ContractsService {
     contractType?: string;
     status?: string;
   }) {
-    const where: any = {};
+    try {
+      const where: any = {};
 
-    if (filters?.vendorId) {
-      where.vendorId = filters.vendorId;
-    }
+      if (filters?.vendorId) {
+        where.vendorId = filters.vendorId;
+      }
 
-    if (filters?.contractType) {
-      where.contractType = filters.contractType;
-    }
+      if (filters?.contractType) {
+        where.contractType = filters.contractType;
+      }
 
-    if (filters?.status) {
-      where.status = filters.status;
-    }
+      if (filters?.status) {
+        where.status = filters.status;
+      }
 
-    return this.prisma.vendorContract.findMany({
-      where,
-      include: {
-        vendor: {
-          select: {
-            id: true,
-            name: true,
-            tier: true,
+      return this.prisma.vendorContract.findMany({
+        where,
+        include: {
+          vendor: {
+            select: {
+              id: true,
+              name: true,
+              tier: true,
+            },
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Error fetching contracts: ${error.message}`, error.stack);
+      return []; // Return empty array on error
+    }
   }
 
   async findOne(id: string) {

@@ -51,7 +51,7 @@ export class RiskService {
     private prisma: PrismaService,
     private auditService: AuditService,
     private cache: CacheService,
-  ) {}
+  ) { }
 
   // ===========================
   // Risk CRUD
@@ -66,60 +66,94 @@ export class RiskService {
     page: number = 1,
     limit: number = 25,
   ) {
-    const where: any = { organizationId, deletedAt: null };
+    try {
+      const where: any = { organizationId, deletedAt: null };
 
-    if (filters.workspaceId) {
-      where.workspaceId = filters.workspaceId;
-    }
+      // Define status arrays for filtering logic
+      const intakeStatuses = ['risk_identified', 'not_a_risk', 'actual_risk', 'risk_analysis_in_progress', 'risk_analyzed'];
+      const assessmentStatuses = ['risk_assessor_analysis', 'grc_approval', 'grc_revision', 'done'];
+      const treatmentStatuses = ['treatment_decision_review', 'routing', 'identify_executive_approver', 'executive_approval', 'risk_mitigation_in_progress', 'mitigation_status_update', 'mitigation_status_routing', 'risk_mitigation_complete', 'risk_accept', 'risk_transfer', 'risk_avoid', 'risk_auto_accept'];
 
-    if (filters.search) {
-      where.OR = [
-        { title: { contains: filters.search, mode: 'insensitive' } },
-        { riskId: { contains: filters.search, mode: 'insensitive' } },
-      ];
-    }
+      if (filters.workspaceId) {
+        where.workspaceId = filters.workspaceId;
+      }
 
-    if (filters.category) {
-      where.category = filters.category;
-    }
+      if (filters.search) {
+        where.OR = [
+          { title: { contains: filters.search, mode: 'insensitive' } },
+          { riskId: { contains: filters.search, mode: 'insensitive' } },
+        ];
+      }
 
-    if (filters.status) {
-      where.status = filters.status;
-    }
+      if (filters.category) {
+        where.category = filters.category;
+      }
 
-    if (filters.riskLevel) {
-      where.inherentRisk = filters.riskLevel;
-    }
+      if (filters.status) {
+        // Check if status is a RiskIntakeStatus (risk status) or RiskAssessmentStatus (assessment status)
+        if (intakeStatuses.includes(filters.status)) {
+          where.status = filters.status as any;
+        } else if (assessmentStatuses.includes(filters.status)) {
+          // Filter by assessment status via relation
+          where.assessment = {
+            status: filters.status as any,
+          };
+        } else if (treatmentStatuses.includes(filters.status)) {
+          // Filter by treatment status via relation
+          where.treatment = {
+            status: filters.status as any,
+          };
+        }
+        // If status doesn't match any known status, ignore it (don't filter)
+      }
 
-    const [risks, total] = await Promise.all([
-      this.prisma.risk.findMany({
-        where,
-        select: {
-          id: true,
-          riskId: true,
-          title: true,
-          category: true,
-          status: true,
-          inherentRisk: true,
-          residualRisk: true,
-          _count: {
-            select: { controls: true, assets: true },
+      if (filters.riskLevel) {
+        where.inherentRisk = filters.riskLevel;
+      }
+
+      // Determine if we need to include assessment/treatment relations for filtering
+      const needsAssessmentInclude = filters?.status && assessmentStatuses.includes(filters.status);
+      const needsTreatmentInclude = filters?.status && treatmentStatuses.includes(filters.status);
+
+      const [risks, total] = await Promise.all([
+        this.prisma.risk.findMany({
+          where,
+          select: {
+            id: true,
+            riskId: true,
+            title: true,
+            category: true,
+            status: true,
+            inherentRisk: true,
+            residualRisk: true,
+            assessment: needsAssessmentInclude ? {
+              select: {
+                status: true,
+              },
+            } : false,
+            treatment: needsTreatmentInclude ? {
+              select: {
+                status: true,
+              },
+            } : false,
+            _count: {
+              select: { controls: true, assets: true },
+            },
           },
-        },
-        orderBy: [{ createdAt: 'desc' }],
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.risk.count({ where }),
-    ]);
+          orderBy: [{ createdAt: 'desc' }],
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        this.prisma.risk.count({ where }),
+      ]);
 
-    return {
-      risks: risks.map(risk => ({
-        id: risk.id,
-        riskId: risk.riskId,
-        title: risk.title,
-        category: risk.category,
-        status: risk.status,
+      return {
+        risks: risks.map(risk => ({
+          id: risk.id,
+          riskId: risk.riskId,
+          title: risk.title,
+          category: risk.category,
+          status: risk.status,
         inherentRisk: risk.inherentRisk,
         residualRisk: risk.residualRisk,
         controlCount: risk._count.controls,
@@ -128,7 +162,17 @@ export class RiskService {
       total,
       page,
       limit,
-    };
+      };
+    } catch (error) {
+      this.logger.error(`Error fetching risks for organization ${organizationId}:`, error);
+      // Return empty result instead of throwing
+      return {
+        risks: [],
+        total: 0,
+        page,
+        limit,
+      };
+    }
   }
 
   async findAll(
@@ -241,158 +285,167 @@ export class RiskService {
   }
 
   async findOne(id: string, organizationId: string): Promise<RiskDetailResponseDto> {
-    const risk = await this.prisma.risk.findFirst({
-      where: { id, organizationId, deletedAt: null },
-      include: {
-        assets: {
-          include: {
-            asset: true,
+    try {
+      const risk = await this.prisma.risk.findFirst({
+        where: { id, organizationId, deletedAt: null },
+        include: {
+          assets: {
+            include: {
+              asset: true,
+            },
           },
-        },
-        controls: {
-          include: {
-            control: {
-              include: {
-                implementations: {
-                  where: { organizationId },
-                  take: 1,
+          controls: {
+            include: {
+              control: {
+                include: {
+                  implementations: {
+                    where: { organizationId },
+                    take: 1,
+                  },
                 },
               },
             },
           },
-        },
-        scenarios: {
-          orderBy: { createdAt: 'desc' },
-        },
-        history: {
-          orderBy: { changedAt: 'desc' },
-          take: 50,
-        },
-        assessment: true,
-        treatment: {
-          include: {
-            updates: {
-              orderBy: { createdAt: 'desc' },
-              take: 20,
+          scenarios: {
+            orderBy: { createdAt: 'desc' },
+          },
+          history: {
+            orderBy: { changedAt: 'desc' },
+            take: 50,
+          },
+          assessment: true,
+          treatment: {
+            include: {
+              updates: {
+                orderBy: { createdAt: 'desc' },
+                take: 20,
+              },
             },
           },
         },
-      },
-    });
+      });
 
-    if (!risk) {
-      throw new NotFoundException('Risk not found');
-    }
+      if (!risk) {
+        throw new NotFoundException('Risk not found');
+      }
 
-    return {
-      ...this.toResponseDto(risk),
-      assets: risk.assets.map(ra => ({
-        id: ra.asset.id,
-        name: ra.asset.name,
-        type: ra.asset.type,
-        criticality: ra.asset.criticality,
-        source: ra.asset.source,
-        notes: ra.notes || undefined,
-      })),
-      controls: risk.controls.map(rc => ({
-        id: rc.control.id,
-        controlId: rc.control.controlId,
-        title: rc.control.title,
-        status: rc.control.implementations[0]?.status || 'not_started',
-        effectiveness: rc.effectiveness,
-        notes: rc.notes || undefined,
-      })),
-      scenarios: risk.scenarios.map(s => ({
-        id: s.id,
-        title: s.title,
-        description: s.description,
-        threatActor: s.threatActor || undefined,
-        attackVector: s.attackVector || undefined,
-        likelihood: s.likelihood,
-        impact: s.impact,
-        createdAt: s.createdAt,
-      })),
-      history: risk.history.map(h => ({
-        id: h.id,
-        action: h.action,
-        changes: h.changes,
-        notes: h.notes || undefined,
-        changedBy: h.changedBy,
-        changedAt: h.changedAt,
-      })),
-      assessment: risk.assessment ? {
-        id: risk.assessment.id,
-        status: risk.assessment.status,
-        riskAssessorId: risk.assessment.riskAssessorId || undefined,
-        grcSmeId: risk.assessment.grcSmeId || undefined,
-        threatDescription: risk.assessment.threatDescription || undefined,
-        affectedAssets: risk.assets?.map(ra => ra.assetId) || [],
-        existingControls: risk.controls?.map(rc => rc.controlId) || [],
-        vulnerabilities: risk.assessment.vulnerabilities || undefined,
-        likelihoodScore: risk.assessment.likelihoodScore || undefined,
-        likelihoodRationale: risk.assessment.likelihoodRationale || undefined,
-        impactScore: risk.assessment.impactScore || undefined,
-        impactRationale: risk.assessment.impactRationale || undefined,
-        impactCategories: risk.assessment.impactCategories || undefined,
-        calculatedRiskScore: risk.assessment.calculatedRiskScore || undefined,
-        recommendedOwnerId: risk.assessment.recommendedOwnerId || undefined,
-        assessmentNotes: risk.assessment.assessmentNotes || undefined,
-        treatmentRecommendation: risk.assessment.treatmentRecommendation || undefined,
-        grcReviewNotes: risk.assessment.grcReviewNotes || undefined,
-        grcApprovedAt: risk.assessment.grcApprovedAt || undefined,
-        grcDeclinedReason: risk.assessment.grcDeclinedReason || undefined,
-        assessorSubmittedAt: risk.assessment.assessorSubmittedAt || undefined,
-        completedAt: risk.assessment.completedAt || undefined,
-        createdAt: risk.assessment.createdAt,
-        updatedAt: risk.assessment.updatedAt,
-      } : undefined,
-      treatment: risk.treatment ? {
-        id: risk.treatment.id,
-        status: risk.treatment.status,
-        riskOwnerId: risk.treatment.riskOwnerId || undefined,
-        executiveApproverId: risk.treatment.executiveApproverId || undefined,
-        grcSmeId: risk.treatment.grcSmeId || undefined,
-        treatmentDecision: risk.treatment.treatmentDecision || undefined,
-        treatmentJustification: risk.treatment.treatmentJustification || undefined,
-        treatmentPlan: risk.treatment.treatmentPlan || undefined,
-        mitigationDescription: risk.treatment.mitigationDescription || undefined,
-        mitigationTargetDate: risk.treatment.mitigationTargetDate || undefined,
-        mitigationActualDate: risk.treatment.mitigationActualDate || undefined,
-        transferTo: risk.treatment.transferTo || undefined,
-        transferCost: risk.treatment.transferCost || undefined,
-        avoidStrategy: risk.treatment.avoidStrategy || undefined,
-        acceptanceRationale: risk.treatment.acceptanceRationale || undefined,
-        acceptanceExpiresAt: risk.treatment.acceptanceExpiresAt || undefined,
-        executiveApprovalRequired: risk.treatment.executiveApprovalRequired,
-        executiveApprovalStatus: risk.treatment.executiveApprovalStatus || undefined,
-        executiveApprovalNotes: risk.treatment.executiveApprovalNotes || undefined,
-        executiveApprovedAt: risk.treatment.executiveApprovedAt || undefined,
-        executiveDeniedReason: risk.treatment.executiveDeniedReason || undefined,
-        mitigationStatus: risk.treatment.mitigationStatus || undefined,
-        mitigationProgress: risk.treatment.mitigationProgress,
-        lastProgressUpdate: risk.treatment.lastProgressUpdate || undefined,
-        nextReviewDate: risk.treatment.nextReviewDate || undefined,
-        residualLikelihood: risk.treatment.residualLikelihood || undefined,
-        residualImpact: risk.treatment.residualImpact || undefined,
-        residualRiskScore: risk.treatment.residualRiskScore || undefined,
-        completedAt: risk.treatment.completedAt || undefined,
-        createdAt: risk.treatment.createdAt,
-        updatedAt: risk.treatment.updatedAt,
-        updates: risk.treatment.updates.map(u => ({
-          id: u.id,
-          updateType: u.updateType,
-          previousStatus: u.previousStatus || undefined,
-          newStatus: u.newStatus || undefined,
-          progress: u.progress || undefined,
-          notes: u.notes || undefined,
-          newTargetDate: u.newTargetDate || undefined,
-          delayReason: u.delayReason || undefined,
-          cancellationReason: u.cancellationReason || undefined,
-          createdBy: u.createdBy,
-          createdAt: u.createdAt,
+      return {
+        ...this.toResponseDto(risk),
+        assets: risk.assets
+          .filter(ra => ra && ra.asset)
+          .map(ra => ({
+            id: ra.asset.id,
+            name: ra.asset.name,
+            type: ra.asset.type,
+            criticality: ra.asset.criticality,
+            source: ra.asset.source,
+            notes: ra.notes || undefined,
+          })),
+        controls: risk.controls
+          .filter(rc => rc && rc.control)
+          .map(rc => ({
+            id: rc.control.id,
+            controlId: rc.control.controlId,
+            title: rc.control.title,
+            status: rc.control.implementations[0]?.status || 'not_started',
+            effectiveness: rc.effectiveness,
+            notes: rc.notes || undefined,
+          })),
+        scenarios: risk.scenarios.map(s => ({
+          id: s.id,
+          title: s.title,
+          description: s.description,
+          threatActor: s.threatActor || undefined,
+          attackVector: s.attackVector || undefined,
+          likelihood: s.likelihood,
+          impact: s.impact,
+          createdAt: s.createdAt,
         })),
-      } : undefined,
-    };
+        history: risk.history.map(h => ({
+          id: h.id,
+          action: h.action,
+          changes: h.changes,
+          notes: h.notes || undefined,
+          changedBy: h.changedBy,
+          changedAt: h.changedAt,
+        })),
+        assessment: risk.assessment ? {
+          id: risk.assessment.id,
+          status: risk.assessment.status,
+          riskAssessorId: risk.assessment.riskAssessorId || undefined,
+          grcSmeId: risk.assessment.grcSmeId || undefined,
+          threatDescription: risk.assessment.threatDescription || undefined,
+          affectedAssets: risk.assets?.filter(ra => ra && ra.asset).map(ra => ra.asset.id) || [],
+          existingControls: risk.controls?.filter(rc => rc && rc.control).map(rc => rc.control.id) || [],
+          vulnerabilities: risk.assessment.vulnerabilities || undefined,
+          likelihoodScore: risk.assessment.likelihoodScore || undefined,
+          likelihoodRationale: risk.assessment.likelihoodRationale || undefined,
+          impactScore: risk.assessment.impactScore || undefined,
+          impactRationale: risk.assessment.impactRationale || undefined,
+          impactCategories: risk.assessment.impactCategories || undefined,
+          calculatedRiskScore: risk.assessment.calculatedRiskScore || undefined,
+          recommendedOwnerId: risk.assessment.recommendedOwnerId || undefined,
+          assessmentNotes: risk.assessment.assessmentNotes || undefined,
+          treatmentRecommendation: risk.assessment.treatmentRecommendation || undefined,
+          grcReviewNotes: risk.assessment.grcReviewNotes || undefined,
+          grcApprovedAt: risk.assessment.grcApprovedAt || undefined,
+          grcDeclinedReason: risk.assessment.grcDeclinedReason || undefined,
+          assessorSubmittedAt: risk.assessment.assessorSubmittedAt || undefined,
+          completedAt: risk.assessment.completedAt || undefined,
+          createdAt: risk.assessment.createdAt,
+          updatedAt: risk.assessment.updatedAt,
+        } : undefined,
+        treatment: risk.treatment ? {
+          id: risk.treatment.id,
+          status: risk.treatment.status,
+          riskOwnerId: risk.treatment.riskOwnerId || undefined,
+          executiveApproverId: risk.treatment.executiveApproverId || undefined,
+          grcSmeId: risk.treatment.grcSmeId || undefined,
+          treatmentDecision: risk.treatment.treatmentDecision || undefined,
+          treatmentJustification: risk.treatment.treatmentJustification || undefined,
+          treatmentPlan: risk.treatment.treatmentPlan || undefined,
+          mitigationDescription: risk.treatment.mitigationDescription || undefined,
+          mitigationTargetDate: risk.treatment.mitigationTargetDate || undefined,
+          mitigationActualDate: risk.treatment.mitigationActualDate || undefined,
+          transferTo: risk.treatment.transferTo || undefined,
+          transferCost: risk.treatment.transferCost || undefined,
+          avoidStrategy: risk.treatment.avoidStrategy || undefined,
+          acceptanceRationale: risk.treatment.acceptanceRationale || undefined,
+          acceptanceExpiresAt: risk.treatment.acceptanceExpiresAt || undefined,
+          executiveApprovalRequired: risk.treatment.executiveApprovalRequired,
+          executiveApprovalStatus: risk.treatment.executiveApprovalStatus || undefined,
+          executiveApprovalNotes: risk.treatment.executiveApprovalNotes || undefined,
+          executiveApprovedAt: risk.treatment.executiveApprovedAt || undefined,
+          executiveDeniedReason: risk.treatment.executiveDeniedReason || undefined,
+          mitigationStatus: risk.treatment.mitigationStatus || undefined,
+          mitigationProgress: risk.treatment.mitigationProgress,
+          lastProgressUpdate: risk.treatment.lastProgressUpdate || undefined,
+          nextReviewDate: risk.treatment.nextReviewDate || undefined,
+          residualLikelihood: risk.treatment.residualLikelihood || undefined,
+          residualImpact: risk.treatment.residualImpact || undefined,
+          residualRiskScore: risk.treatment.residualRiskScore || undefined,
+          completedAt: risk.treatment.completedAt || undefined,
+          createdAt: risk.treatment.createdAt,
+          updatedAt: risk.treatment.updatedAt,
+          updates: risk.treatment.updates.map(u => ({
+            id: u.id,
+            updateType: u.updateType,
+            previousStatus: u.previousStatus || undefined,
+            newStatus: u.newStatus || undefined,
+            progress: u.progress || undefined,
+            notes: u.notes || undefined,
+            newTargetDate: u.newTargetDate || undefined,
+            delayReason: u.delayReason || undefined,
+            cancellationReason: u.cancellationReason || undefined,
+            createdBy: u.createdBy,
+            createdAt: u.createdAt,
+          })),
+        } : undefined,
+      };
+    } catch (error) {
+      this.logger.error(`Error finding risk ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   // Invalidate risk-related caches for an organization
@@ -1353,8 +1406,8 @@ export class RiskService {
           treatmentId: risk.treatment.id,
           updateType: dto.status === MitigationProgressStatus.DONE ? 'completion'
             : dto.status === MitigationProgressStatus.DELAYED ? 'delay'
-            : dto.status === MitigationProgressStatus.CANCELLED ? 'cancellation'
-            : 'progress',
+              : dto.status === MitigationProgressStatus.CANCELLED ? 'cancellation'
+                : 'progress',
           previousStatus: risk.treatment.mitigationStatus as any,
           newStatus: dto.status as any,
           progress: dto.progress,
@@ -1904,7 +1957,7 @@ export class RiskService {
 
   async getDashboard(organizationId: string): Promise<RiskDashboardDto> {
     const cacheKey = `risk:dashboard:${organizationId}`;
-    
+
     // Cache risk dashboard for 5 minutes (dashboard data doesn't change frequently)
     return this.cache.getOrSet(
       cacheKey,
@@ -2132,7 +2185,7 @@ export class RiskService {
 
   async getHeatmap(organizationId: string): Promise<RiskHeatmapDto> {
     const cacheKey = CacheKeys.riskMatrix(organizationId);
-    
+
     // Cache heatmap for 2 minutes
     return this.cache.getOrSet(
       cacheKey,

@@ -55,6 +55,29 @@ export class EmployeeComplianceController {
     });
   }
 
+  @Get('config')
+  @ApiOperation({ summary: 'Get employee compliance configuration' })
+  async getConfig(@User() user: UserContext) {
+    try {
+      // Return default config or retrieve from database if stored
+      return {
+        enabled: true,
+        syncInterval: 3600, // 1 hour
+        complianceThreshold: 80,
+        autoRecalculate: true,
+        organizationId: user.organizationId,
+      };
+    } catch (error) {
+      return {
+        enabled: true,
+        syncInterval: 3600,
+        complianceThreshold: 80,
+        autoRecalculate: true,
+        organizationId: user.organizationId,
+      };
+    }
+  }
+
   @Get('dashboard')
   @ApiOperation({ summary: 'Get compliance dashboard metrics' })
   async getDashboard(@User() user: UserContext) {

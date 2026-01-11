@@ -11,7 +11,7 @@ import {
 import { TprmConfigService } from './tprm-config.service';
 import { UpdateTprmConfigurationDto, VendorCategoryDto } from './dto/tprm-config.dto';
 
-@Controller('tprm-config')
+@Controller('api/tprm-config')
 export class TprmConfigController {
   constructor(private readonly tprmConfigService: TprmConfigService) {}
 

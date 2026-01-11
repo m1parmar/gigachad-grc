@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateFindingDto } from './dto/create-finding.dto';
 import { UpdateFindingDto } from './dto/update-finding.dto';
 
 @Injectable()
 export class FindingsService {
+  private readonly logger = new Logger(FindingsService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async create(createFindingDto: CreateFindingDto, identifiedBy: string) {
@@ -55,45 +57,55 @@ export class FindingsService {
       remediationOwner?: string;
     },
   ) {
-    const where: any = { organizationId };
+    try {
+      if (!organizationId) {
+        this.logger.warn('findAll called without organizationId');
+        return [];
+      }
 
-    if (filters?.auditId) {
-      where.auditId = filters.auditId;
-    }
-    if (filters?.status) {
-      where.status = filters.status;
-    }
-    if (filters?.severity) {
-      where.severity = filters.severity;
-    }
-    if (filters?.category) {
-      where.category = filters.category;
-    }
-    if (filters?.remediationOwner) {
-      where.remediationOwner = filters.remediationOwner;
-    }
+      const where: any = { organizationId };
 
-    return this.prisma.auditFinding.findMany({
-      where,
-      include: {
-        audit: {
-          select: {
-            id: true,
-            name: true,
-            auditId: true,
+      if (filters?.auditId) {
+        where.auditId = filters.auditId;
+      }
+      if (filters?.status) {
+        where.status = filters.status;
+      }
+      if (filters?.severity) {
+        where.severity = filters.severity;
+      }
+      if (filters?.category) {
+        where.category = filters.category;
+      }
+      if (filters?.remediationOwner) {
+        where.remediationOwner = filters.remediationOwner;
+      }
+
+      return await this.prisma.auditFinding.findMany({
+        where,
+        include: {
+          audit: {
+            select: {
+              id: true,
+              name: true,
+              auditId: true,
+            },
+          },
+          identifiedByUser: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+            },
           },
         },
-        identifiedByUser: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-      orderBy: [{ severity: 'asc' }, { createdAt: 'desc' }],
-    });
+        orderBy: [{ severity: 'asc' }, { createdAt: 'desc' }],
+      });
+    } catch (error) {
+      this.logger.error(`Failed to find audit findings for organization ${organizationId}: ${error.message}`, error.stack);
+      return [];
+    }
   }
 
   async findOne(id: string, organizationId: string) {
@@ -188,39 +200,48 @@ export class FindingsService {
   }
 
   async getStats(organizationId: string) {
-    const [total, bySeverity, byStatus, byCategory, overdue] = await Promise.all([
-      this.prisma.auditFinding.count({ where: { organizationId } }),
-      this.prisma.auditFinding.groupBy({
-        by: ['severity'],
-        where: { organizationId },
-        _count: { severity: true },
-      }),
-      this.prisma.auditFinding.groupBy({
-        by: ['status'],
-        where: { organizationId },
-        _count: { status: true },
-      }),
-      this.prisma.auditFinding.groupBy({
-        by: ['category'],
-        where: { organizationId },
-        _count: { category: true },
-      }),
-      this.prisma.auditFinding.count({
-        where: {
-          organizationId,
-          status: { notIn: ['resolved', 'accepted_risk'] },
-          targetDate: { lt: new Date() },
-        },
-      }),
-    ]);
+    try {
+      if (!organizationId) {
+        return { total: 0, overdue: 0, bySeverity: [], byStatus: [], byCategory: [] };
+      }
 
-    return {
-      total,
-      overdue,
-      bySeverity: bySeverity.map((s) => ({ severity: s.severity, count: s._count.severity })),
-      byStatus: byStatus.map((s) => ({ status: s.status, count: s._count.status })),
-      byCategory: byCategory.map((c) => ({ category: c.category, count: c._count.category })),
-    };
+      const [total, bySeverity, byStatus, byCategory, overdue] = await Promise.all([
+        this.prisma.auditFinding.count({ where: { organizationId } }).catch(() => 0),
+        this.prisma.auditFinding.groupBy({
+          by: ['severity'],
+          where: { organizationId },
+          _count: { severity: true },
+        }).catch(() => []),
+        this.prisma.auditFinding.groupBy({
+          by: ['status'],
+          where: { organizationId },
+          _count: { status: true },
+        }).catch(() => []),
+        this.prisma.auditFinding.groupBy({
+          by: ['category'],
+          where: { organizationId },
+          _count: { category: true },
+        }).catch(() => []),
+        this.prisma.auditFinding.count({
+          where: {
+            organizationId,
+            status: { notIn: ['resolved', 'accepted_risk'] },
+            targetDate: { lt: new Date() },
+          },
+        }).catch(() => 0),
+      ]);
+
+      return {
+        total: total || 0,
+        overdue: overdue || 0,
+        bySeverity: Array.isArray(bySeverity) ? bySeverity.map((s) => ({ severity: s.severity, count: s._count.severity })) : [],
+        byStatus: Array.isArray(byStatus) ? byStatus.map((s) => ({ status: s.status, count: s._count.status })) : [],
+        byCategory: Array.isArray(byCategory) ? byCategory.map((c) => ({ category: c.category, count: c._count.category })) : [],
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get findings stats for organization ${organizationId}: ${error.message}`, error.stack);
+      return { total: 0, overdue: 0, bySeverity: [], byStatus: [], byCategory: [] };
+    }
   }
 }
 

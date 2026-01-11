@@ -38,11 +38,20 @@ class GetPromptDto {
 @Controller('api/mcp')
 @UseGuards(DevAuthGuard, PermissionGuard)
 export class MCPController {
-  constructor(private readonly mcpClient: MCPClientService) {}
+  constructor(private readonly mcpClient: MCPClientService) { }
 
   // ============================================
   // Server Management
   // ============================================
+
+
+  @Get('templates')
+  @ApiOperation({ summary: 'List available MCP server templates' })
+  @RequirePermission(Resource.INTEGRATIONS, Action.READ)
+  getTemplates() {
+    // Return empty list as a placeholder if no templates service logic exists yet
+    return { success: true, data: [] };
+  }
 
   @Get('servers')
   @ApiOperation({ summary: 'List all MCP servers and their status' })

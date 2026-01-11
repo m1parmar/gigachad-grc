@@ -30,12 +30,15 @@ interface AuthenticatedRequest extends Request {
 @Controller('api/audits')
 @UseGuards(DevAuthGuard)
 export class AuditsController {
-  constructor(private readonly auditsService: AuditsService) {}
+  constructor(private readonly auditsService: AuditsService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new audit' })
   @ApiResponse({ status: 201, description: 'Audit created successfully' })
   create(@Body() createAuditDto: CreateAuditDto, @Req() req: AuthenticatedRequest) {
+    if (!createAuditDto.organizationId) {
+      createAuditDto.organizationId = req.user.organizationId;
+    }
     return this.auditsService.create(createAuditDto, req.user.userId);
   }
 

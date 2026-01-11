@@ -232,19 +232,19 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  
+
   // Add user ID for notifications and other user-specific endpoints
   const userId = secureStorage.get(STORAGE_KEYS.USER_ID) || localStorage.getItem('userId');
   if (userId) {
     config.headers['x-user-id'] = userId;
   }
-  
+
   // Add organization ID
   const orgId = secureStorage.get(STORAGE_KEYS.ORGANIZATION_ID) || localStorage.getItem('organizationId');
   if (orgId) {
     config.headers['x-organization-id'] = orgId;
   }
-  
+
   return config;
 });
 
@@ -265,7 +265,7 @@ api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const config = error.config as any;
-    
+
     // Initialize retry count if not present
     if (config && config.__retryCount === undefined) {
       config.__retryCount = 0;
@@ -275,15 +275,15 @@ api.interceptors.response.use(
     if (config && shouldRetry(error, config.__retryCount)) {
       config.__retryCount += 1;
       const delay = calculateRetryDelay(config.__retryCount);
-      
+
       console.log(
         `API request failed, retrying in ${delay}ms ` +
         `(attempt ${config.__retryCount}/${RETRY_CONFIG.maxRetries}): ` +
         `${config.method?.toUpperCase()} ${config.url}`
       );
-      
+
       await sleep(delay);
-      
+
       // Retry the request
       return api.request(config);
     }
@@ -294,30 +294,30 @@ api.interceptors.response.use(
       if (isRedirecting) {
         return Promise.reject(error);
       }
-      
+
       // Skip redirect for certain endpoints that might fail during normal operation
       const url = error.config?.url || '';
       const skipRedirectEndpoints = ['/api/health', '/api/workspaces/status'];
       if (skipRedirectEndpoints.some(endpoint => url.includes(endpoint))) {
         return Promise.reject(error);
       }
-      
+
       // Handle unauthorized - clear all auth data
       secureStorage.clearAll();
       // Also clear legacy storage
       localStorage.removeItem('token');
       localStorage.removeItem('userId');
       localStorage.removeItem('organizationId');
-      
+
       // Only redirect if we're not already on the login page to prevent redirect loops
       if (!window.location.pathname.includes('/login')) {
         isRedirecting = true;
-        
+
         // Clear any pending redirect timeout
         if (redirectTimeout) {
           clearTimeout(redirectTimeout);
         }
-        
+
         // Use a small delay to batch multiple 401s and prevent rapid redirects
         redirectTimeout = setTimeout(() => {
           // Use replace to avoid adding to history and prevent back button issues
@@ -325,7 +325,7 @@ api.interceptors.response.use(
         }, 100);
       }
     }
-    
+
     return Promise.reject(error);
   }
 );
@@ -342,41 +342,41 @@ interface ControlListResponse {
 }
 
 export const controlsApi = {
-  list: (params?: ControlListParams): Promise<AxiosResponse<ControlListResponse>> => 
+  list: (params?: ControlListParams): Promise<AxiosResponse<ControlListResponse>> =>
     api.get('/api/controls', { params }),
-  get: (id: string): Promise<AxiosResponse<Control>> => 
+  get: (id: string): Promise<AxiosResponse<Control>> =>
     api.get(`/api/controls/${id}`),
-  create: (data: CreateControlData): Promise<AxiosResponse<Control>> => 
+  create: (data: CreateControlData): Promise<AxiosResponse<Control>> =>
     api.post('/api/controls', data),
-  update: (id: string, data: UpdateControlData): Promise<AxiosResponse<Control>> => 
+  update: (id: string, data: UpdateControlData): Promise<AxiosResponse<Control>> =>
     api.put(`/api/controls/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/controls/${id}`),
-  getCategories: (): Promise<AxiosResponse<string[]>> => 
+  getCategories: (): Promise<AxiosResponse<string[]>> =>
     api.get('/api/controls/categories'),
-  getTags: (): Promise<AxiosResponse<string[]>> => 
+  getTags: (): Promise<AxiosResponse<string[]>> =>
     api.get('/api/controls/tags'),
   // Bulk upload endpoints
   bulkUpload: (data: BulkControlUploadData): Promise<AxiosResponse<{ created: number; updated: number; skipped: number }>> =>
     api.post('/api/controls/bulk', data),
   bulkUploadCSV: (data: { csv: string; skipExisting?: boolean; updateExisting?: boolean }): Promise<AxiosResponse<{ created: number; updated: number; skipped: number }>> =>
     api.post('/api/controls/bulk/csv', data),
-  getTemplate: (): Promise<AxiosResponse<string>> => 
+  getTemplate: (): Promise<AxiosResponse<string>> =>
     api.get('/api/controls/bulk/template', { responseType: 'text' }),
 };
 
 export const implementationsApi = {
-  list: (params?: PaginationParams & { controlId?: string; status?: string }): Promise<AxiosResponse<ControlImplementation[]>> => 
+  list: (params?: PaginationParams & { controlId?: string; status?: string }): Promise<AxiosResponse<ControlImplementation[]>> =>
     api.get('/api/implementations', { params }),
-  get: (id: string): Promise<AxiosResponse<ControlImplementation>> => 
+  get: (id: string): Promise<AxiosResponse<ControlImplementation>> =>
     api.get(`/api/implementations/${id}`),
-  update: (id: string, data: UpdateImplementationData): Promise<AxiosResponse<ControlImplementation>> => 
+  update: (id: string, data: UpdateImplementationData): Promise<AxiosResponse<ControlImplementation>> =>
     api.put(`/api/implementations/${id}`, data),
-  bulkUpdate: (data: { ids: string[]; updates: UpdateImplementationData }): Promise<AxiosResponse<{ updated: number }>> => 
+  bulkUpdate: (data: { ids: string[]; updates: UpdateImplementationData }): Promise<AxiosResponse<{ updated: number }>> =>
     api.post('/api/implementations/bulk-update', data),
-  createTest: (id: string, data: CreateControlTestData): Promise<AxiosResponse<{ id: string }>> => 
+  createTest: (id: string, data: CreateControlTestData): Promise<AxiosResponse<{ id: string }>> =>
     api.post(`/api/implementations/${id}/tests`, data),
-  getTests: (id: string): Promise<AxiosResponse<Array<{ id: string; testType: string; result: string; testedAt: string }>>> => 
+  getTests: (id: string): Promise<AxiosResponse<Array<{ id: string; testType: string; result: string; testedAt: string }>>> =>
     api.get(`/api/implementations/${id}/tests`),
 };
 
@@ -400,9 +400,9 @@ export const collectorsApi = {
 };
 
 export const evidenceApi = {
-  list: (params?: EvidenceListParams): Promise<AxiosResponse<Evidence[]>> => 
+  list: (params?: EvidenceListParams): Promise<AxiosResponse<Evidence[]>> =>
     api.get('/api/evidence', { params }),
-  get: (id: string): Promise<AxiosResponse<Evidence>> => 
+  get: (id: string): Promise<AxiosResponse<Evidence>> =>
     api.get(`/api/evidence/${id}`),
   upload: (file: File, data: UploadEvidenceData): Promise<{ data: Evidence }> => {
     const formData = new FormData();
@@ -432,40 +432,40 @@ export const evidenceApi = {
       return { data: await res.json() as Evidence };
     });
   },
-  update: (id: string, data: UpdateEvidenceData): Promise<AxiosResponse<Evidence>> => 
+  update: (id: string, data: UpdateEvidenceData): Promise<AxiosResponse<Evidence>> =>
     api.put(`/api/evidence/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/evidence/${id}`),
-  getDownloadUrl: (id: string): Promise<AxiosResponse<{ url: string }>> => 
+  getDownloadUrl: (id: string): Promise<AxiosResponse<{ url: string }>> =>
     api.get(`/api/evidence/${id}/download`),
-  review: (id: string, data: ReviewEvidenceData): Promise<AxiosResponse<Evidence>> => 
+  review: (id: string, data: ReviewEvidenceData): Promise<AxiosResponse<Evidence>> =>
     api.post(`/api/evidence/${id}/review`, data),
-  link: (id: string, controlIds: string[]): Promise<AxiosResponse<void>> => 
+  link: (id: string, controlIds: string[]): Promise<AxiosResponse<void>> =>
     api.post(`/api/evidence/${id}/link`, { controlIds }),
-  unlink: (id: string, controlId: string): Promise<AxiosResponse<void>> => 
+  unlink: (id: string, controlId: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/evidence/${id}/link/${controlId}`),
-  getStats: (): Promise<AxiosResponse<{ total: number; pending: number; approved: number; expiring: number; pendingReview?: number; expiringSoon?: number; expired?: number }>> => 
+  getStats: (): Promise<AxiosResponse<{ total: number; pending: number; approved: number; expiring: number; pendingReview?: number; expiringSoon?: number; expired?: number }>> =>
     api.get('/api/evidence/stats'),
-  getFolders: (parentId?: string): Promise<AxiosResponse<EvidenceFolder[]>> => 
+  getFolders: (parentId?: string): Promise<AxiosResponse<EvidenceFolder[]>> =>
     api.get('/api/evidence/folders', { params: { parentId } }),
-  createFolder: (data: CreateEvidenceFolderData): Promise<AxiosResponse<EvidenceFolder>> => 
+  createFolder: (data: CreateEvidenceFolderData): Promise<AxiosResponse<EvidenceFolder>> =>
     api.post('/api/evidence/folders', data),
 };
 
 export const frameworksApi = {
-  list: (): Promise<AxiosResponse<Framework[]>> => 
+  list: (): Promise<AxiosResponse<Framework[]>> =>
     api.get('/api/frameworks'),
-  get: (id: string): Promise<AxiosResponse<Framework>> => 
+  get: (id: string): Promise<AxiosResponse<Framework>> =>
     api.get(`/api/frameworks/${id}`),
   create: (data: CreateFrameworkData): Promise<AxiosResponse<Framework>> =>
     api.post('/api/frameworks', data),
-  update: (id: string, data: UpdateFrameworkData): Promise<AxiosResponse<Framework>> => 
+  update: (id: string, data: UpdateFrameworkData): Promise<AxiosResponse<Framework>> =>
     api.put(`/api/frameworks/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/frameworks/${id}`),
   getRequirements: (id: string, parentId?: string): Promise<AxiosResponse<FrameworkRequirement[]>> =>
     api.get(`/api/frameworks/${id}/requirements`, { params: { parentId } }),
-  getRequirementTree: (id: string): Promise<AxiosResponse<FrameworkRequirement[]>> => 
+  getRequirementTree: (id: string): Promise<AxiosResponse<FrameworkRequirement[]>> =>
     api.get(`/api/frameworks/${id}/requirements/tree`),
   getRequirement: (frameworkId: string, requirementId: string): Promise<AxiosResponse<FrameworkRequirement>> =>
     api.get(`/api/frameworks/${frameworkId}/requirements/${requirementId}`),
@@ -480,9 +480,9 @@ export const frameworksApi = {
   },
   updateRequirement: (frameworkId: string, requirementId: string, data: UpdateRequirementData): Promise<AxiosResponse<FrameworkRequirement>> =>
     api.put(`/api/frameworks/${frameworkId}/requirements/${requirementId}`, data),
-  getReadiness: (id: string): Promise<AxiosResponse<{ 
-    score: number; 
-    requirements: number; 
+  getReadiness: (id: string): Promise<AxiosResponse<{
+    score: number;
+    requirements: number;
     compliant: number;
     requirementsByStatus?: {
       compliant: number;
@@ -491,39 +491,39 @@ export const frameworksApi = {
       not_applicable: number;
       not_assessed: number;
     };
-  }>> => 
+  }>> =>
     api.get(`/api/frameworks/${id}/readiness`),
   // Seed endpoints
-  getSeedStatus: (): Promise<AxiosResponse<{ seeded: boolean }>> => 
+  getSeedStatus: (): Promise<AxiosResponse<{ seeded: boolean }>> =>
     api.get('/api/frameworks/seed/status'),
-  seed: (): Promise<AxiosResponse<{ message: string }>> => 
+  seed: (): Promise<AxiosResponse<{ message: string }>> =>
     api.post('/api/frameworks/seed'),
 };
 
 export const usersApi = {
   list: (params?: UserListParams): Promise<AxiosResponse<{ data: User[]; total: number }>> =>
     api.get('/api/users', { params }),
-  get: (id: string): Promise<AxiosResponse<User>> => 
+  get: (id: string): Promise<AxiosResponse<User>> =>
     api.get(`/api/users/${id}`),
-  getMe: (): Promise<AxiosResponse<User>> => 
+  getMe: (): Promise<AxiosResponse<User>> =>
     api.get('/api/users/me'),
-  getStats: (): Promise<AxiosResponse<{ total: number; active: number; inactive: number; byRole: Record<string, number> }>> => 
+  getStats: (): Promise<AxiosResponse<{ total: number; active: number; inactive: number; byRole: Record<string, number> }>> =>
     api.get('/api/users/stats'),
-  create: (data: CreateUserData): Promise<AxiosResponse<User>> => 
+  create: (data: CreateUserData): Promise<AxiosResponse<User>> =>
     api.post('/api/users', data),
-  update: (id: string, data: UpdateUserData): Promise<AxiosResponse<User>> => 
+  update: (id: string, data: UpdateUserData): Promise<AxiosResponse<User>> =>
     api.put(`/api/users/${id}`, data),
-  deactivate: (id: string): Promise<AxiosResponse<User>> => 
+  deactivate: (id: string): Promise<AxiosResponse<User>> =>
     api.post(`/api/users/${id}/deactivate`),
-  reactivate: (id: string): Promise<AxiosResponse<User>> => 
+  reactivate: (id: string): Promise<AxiosResponse<User>> =>
     api.post(`/api/users/${id}/reactivate`),
-  getPermissions: (id: string): Promise<AxiosResponse<Permission[]>> => 
+  getPermissions: (id: string): Promise<AxiosResponse<Permission[]>> =>
     api.get(`/api/users/${id}/permissions`),
-  getGroups: (id: string): Promise<AxiosResponse<Array<{ id: string; name: string }>>> => 
+  getGroups: (id: string): Promise<AxiosResponse<Array<{ id: string; name: string }>>> =>
     api.get(`/api/users/${id}/groups`),
-  addToGroup: (userId: string, groupId: string): Promise<AxiosResponse<void>> => 
+  addToGroup: (userId: string, groupId: string): Promise<AxiosResponse<void>> =>
     api.post(`/api/users/${userId}/groups/${groupId}`),
-  removeFromGroup: (userId: string, groupId: string): Promise<AxiosResponse<void>> => 
+  removeFromGroup: (userId: string, groupId: string): Promise<AxiosResponse<void>> =>
     api.post(`/api/users/${userId}/groups/${groupId}/remove`),
   sync: (data: { keycloakId: string; email: string; firstName?: string; lastName?: string; roles?: string[] }): Promise<AxiosResponse<User>> =>
     api.post('/api/users/sync', data),
@@ -538,21 +538,21 @@ export const permissionsApi = {
   updateGroup: (id: string, data: UpdatePermissionGroupData) =>
     api.put(`/api/permissions/groups/${id}`, data),
   deleteGroup: (id: string) => api.delete(`/api/permissions/groups/${id}`),
-  getGroupMembers: (id: string): Promise<AxiosResponse<User[]>> => 
+  getGroupMembers: (id: string): Promise<AxiosResponse<User[]>> =>
     api.get(`/api/permissions/groups/${id}/members`),
   addGroupMember: (groupId: string, userId: string) =>
     api.post(`/api/permissions/groups/${groupId}/members`, { userId }),
   removeGroupMember: (groupId: string, userId: string) =>
     api.delete(`/api/permissions/groups/${groupId}/members/${userId}`),
-  
+
   // User Permissions
-  getUserPermissions: (userId: string): Promise<AxiosResponse<UserPermissionsResponse>> => 
+  getUserPermissions: (userId: string): Promise<AxiosResponse<UserPermissionsResponse>> =>
     api.get(`/api/permissions/users/${userId}`),
   setUserOverrides: (userId: string, overrides: UserPermissionOverride[]) =>
     api.put(`/api/permissions/users/${userId}/overrides`, { overrides }),
-  getUserOverrides: (userId: string): Promise<AxiosResponse<UserPermissionOverride[]>> => 
+  getUserOverrides: (userId: string): Promise<AxiosResponse<UserPermissionOverride[]>> =>
     api.get(`/api/permissions/users/${userId}/overrides`),
-  
+
   // Check Permission
   checkPermission: (resource: string, action: string, resourceId?: string): Promise<AxiosResponse<{ allowed: boolean }>> =>
     api.get('/api/permissions/check', {
@@ -562,9 +562,9 @@ export const permissionsApi = {
         'x-check-resource-id': resourceId || '',
       },
     }),
-  
+
   // Available permissions
-  getAvailable: (): Promise<AxiosResponse<Permission[]>> => 
+  getAvailable: (): Promise<AxiosResponse<Permission[]>> =>
     api.get('/api/permissions/available'),
 
   // Module configuration (org-level)
@@ -572,7 +572,7 @@ export const permissionsApi = {
     api.get(`${CONTROLS_API_URL}/api/modules`),
   updateModules: (enabledModules: string[]): Promise<AxiosResponse<{ enabledModules: string[] }>> =>
     api.put(`${CONTROLS_API_URL}/api/modules`, { enabledModules }),
-  
+
   // Seed default groups
   seedDefaults: () => api.post('/api/permissions/seed'),
 };
@@ -583,20 +583,20 @@ interface PolicyListResponse {
 }
 
 export const policiesApi = {
-  list: (params?: PolicyListParams): Promise<AxiosResponse<PolicyListResponse>> => 
+  list: (params?: PolicyListParams): Promise<AxiosResponse<PolicyListResponse>> =>
     api.get('/api/policies', { params }),
-  get: (id: string): Promise<AxiosResponse<Policy>> => 
+  get: (id: string): Promise<AxiosResponse<Policy>> =>
     api.get(`/api/policies/${id}`),
-  getStats: (): Promise<AxiosResponse<{ 
-    total: number; 
-    byStatus: Record<string, number>; 
+  getStats: (): Promise<AxiosResponse<{
+    total: number;
+    byStatus: Record<string, number>;
     byType: Record<string, number>;
     published?: number;
     approved?: number;
     inReview?: number;
     draft?: number;
     overdueReview?: number;
-  }>> => 
+  }>> =>
     api.get('/api/policies/stats'),
   upload: async (file: File, data: UploadPolicyData): Promise<Policy> => {
     const formData = new FormData();
@@ -621,13 +621,13 @@ export const policiesApi = {
     }
     return response.json() as Promise<Policy>;
   },
-  update: (id: string, data: UpdatePolicyData): Promise<AxiosResponse<Policy>> => 
+  update: (id: string, data: UpdatePolicyData): Promise<AxiosResponse<Policy>> =>
     api.put(`/api/policies/${id}`, data),
   updateStatus: (id: string, status: string, notes?: string): Promise<AxiosResponse<Policy>> =>
     api.put(`/api/policies/${id}/status`, { status, notes }),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/policies/${id}`),
-  getDownloadUrl: (id: string): Promise<AxiosResponse<{ url: string }>> => 
+  getDownloadUrl: (id: string): Promise<AxiosResponse<{ url: string }>> =>
     api.get(`/api/policies/${id}/download`),
   getPreviewUrl: (id: string): string => `/api/policies/${id}/preview`,
   uploadNewVersion: async (id: string, file: File, versionNumber: string, changeNotes?: string): Promise<Policy> => {
@@ -671,15 +671,15 @@ export const tasksApi = {
 };
 
 export const assessmentsApi = {
-  list: (frameworkId?: string): Promise<AxiosResponse<VendorAssessment[]>> => 
+  list: (frameworkId?: string): Promise<AxiosResponse<VendorAssessment[]>> =>
     api.get('/api/assessments', { params: { frameworkId } }),
-  get: (id: string): Promise<AxiosResponse<VendorAssessment>> => 
+  get: (id: string): Promise<AxiosResponse<VendorAssessment>> =>
     api.get(`/api/assessments/${id}`),
-  create: (data: CreateVendorAssessmentData | Record<string, unknown>): Promise<AxiosResponse<VendorAssessment>> => 
+  create: (data: CreateVendorAssessmentData | Record<string, unknown>): Promise<AxiosResponse<VendorAssessment>> =>
     api.post('/api/assessments', data),
-  update: (id: string, data: UpdateVendorAssessmentData | Record<string, unknown>): Promise<AxiosResponse<VendorAssessment>> => 
+  update: (id: string, data: UpdateVendorAssessmentData | Record<string, unknown>): Promise<AxiosResponse<VendorAssessment>> =>
     api.patch(`/api/assessments/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/assessments/${id}`),
   updateRequirementStatus: (id: string, requirementId: string, data: AssessmentRequirementUpdate) =>
     api.put(`/api/assessments/${id}/requirements/${requirementId}`, data),
@@ -747,7 +747,7 @@ export interface FullDashboardResponse {
 
 export const dashboardApi = {
   // Consolidated endpoint - use this for initial dashboard load (reduces 6 API calls to 1)
-  getFull: (): Promise<AxiosResponse<FullDashboardResponse>> => 
+  getFull: (): Promise<AxiosResponse<FullDashboardResponse>> =>
     api.get('/api/dashboard/full'),
   // Individual endpoints (kept for backward compatibility and specific use cases)
   getSummary: () => api.get('/api/dashboard/summary'),
@@ -763,24 +763,24 @@ export const dashboardApi = {
 export const integrationsApi = {
   list: (params?: IntegrationListParams): Promise<AxiosResponse<Integration[]>> =>
     api.get('/api/integrations', { params }),
-  get: (id: string): Promise<AxiosResponse<Integration>> => 
+  get: (id: string): Promise<AxiosResponse<Integration>> =>
     api.get(`/api/integrations/${id}`),
-  getStats: (): Promise<AxiosResponse<{ total: number; active: number; byType: Record<string, number>; byStatus?: Record<string, number>; totalEvidenceCollected?: number }>> => 
+  getStats: (): Promise<AxiosResponse<{ total: number; active: number; byType: Record<string, number>; byStatus?: Record<string, number>; totalEvidenceCollected?: number }>> =>
     api.get('/api/integrations/stats'),
   getTypes: () => api.get('/api/integrations/types'),
   create: (data: CreateIntegrationData): Promise<AxiosResponse<Integration>> =>
     api.post('/api/integrations', data),
   update: (id: string, data: UpdateIntegrationData): Promise<AxiosResponse<Integration>> =>
     api.put(`/api/integrations/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/integrations/${id}`),
   testConnection: (id: string) => api.post(`/api/integrations/${id}/test`),
   triggerSync: (id: string) => api.post(`/api/integrations/${id}/sync`),
-  
+
   // Custom integration config
-  getCustomConfig: (id: string): Promise<AxiosResponse<CustomIntegrationConfig>> => 
+  getCustomConfig: (id: string): Promise<AxiosResponse<CustomIntegrationConfig>> =>
     api.get(`/api/integrations/${id}/custom-config`),
-  saveCustomConfig: (id: string, config: CustomIntegrationConfig) => 
+  saveCustomConfig: (id: string, config: CustomIntegrationConfig) =>
     api.put(`/api/integrations/${id}/custom-config`, config),
   testCustomEndpoint: (id: string, data?: { endpointIndex?: number; baseUrl?: string; authConfig?: Record<string, unknown> }) =>
     api.post(`/api/integrations/${id}/custom-config/test`, data || {}),
@@ -803,14 +803,14 @@ export const configAsCodeApi = {
     updateExisting?: boolean;
   }) => api.post('/api/config-as-code/import', data),
   // File management endpoints
-  listFiles: (workspaceId?: string, initialize?: boolean) => 
-    api.get('/api/config-as-code/files', { 
-      params: { 
+  listFiles: (workspaceId?: string, initialize?: boolean) =>
+    api.get('/api/config-as-code/files', {
+      params: {
         ...(workspaceId ? { workspaceId } : {}),
         ...(initialize ? { initialize: 'true' } : {}),
-      } 
+      }
     }),
-  getFile: (path: string, workspaceId?: string) => 
+  getFile: (path: string, workspaceId?: string) =>
     api.get(`/api/config-as-code/files/${encodeURIComponent(path)}`, { params: workspaceId ? { workspaceId } : {} }),
   createFile: (data: {
     path: string;
@@ -819,9 +819,9 @@ export const configAsCodeApi = {
     workspaceId?: string;
     commitMessage?: string;
   }) => api.post('/api/config-as-code/files', data),
-  updateFile: (path: string, data: { content: string; commitMessage?: string }, workspaceId?: string) => 
+  updateFile: (path: string, data: { content: string; commitMessage?: string }, workspaceId?: string) =>
     api.put(`/api/config-as-code/files/${encodeURIComponent(path)}`, data, { params: workspaceId ? { workspaceId } : {} }),
-  deleteFile: (path: string, workspaceId?: string) => 
+  deleteFile: (path: string, workspaceId?: string) =>
     api.delete(`/api/config-as-code/files/${encodeURIComponent(path)}`, { params: workspaceId ? { workspaceId } : {} }),
   previewChanges: (data: {
     path: string;
@@ -833,9 +833,9 @@ export const configAsCodeApi = {
     content: string;
     format: 'terraform' | 'yaml' | 'json';
     commitMessage?: string;
-  }, workspaceId?: string) => 
+  }, workspaceId?: string) =>
     api.post('/api/config-as-code/files/apply', data, { params: workspaceId ? { workspaceId } : {} }),
-  getVersionHistory: (path: string, workspaceId?: string) => 
+  getVersionHistory: (path: string, workspaceId?: string) =>
     api.get(`/api/config-as-code/files/${encodeURIComponent(path)}/versions`, { params: workspaceId ? { workspaceId } : {} }),
   refreshFromDatabase: (workspaceId?: string) =>
     api.post('/api/config-as-code/files/refresh', {}, { params: workspaceId ? { workspaceId } : {} }),
@@ -867,13 +867,13 @@ export const auditApi = {
 export const auditsApi = {
   list: (params?: AuditListParams): Promise<AxiosResponse<Audit[]>> =>
     api.get('/api/audits', { params }),
-  get: (id: string): Promise<AxiosResponse<Audit>> => 
+  get: (id: string): Promise<AxiosResponse<Audit>> =>
     api.get(`/api/audits/${id}`),
-  create: (data: CreateAuditData): Promise<AxiosResponse<Audit>> => 
+  create: (data: CreateAuditData): Promise<AxiosResponse<Audit>> =>
     api.post('/api/audits', data),
-  update: (id: string, data: UpdateAuditData): Promise<AxiosResponse<Audit>> => 
+  update: (id: string, data: UpdateAuditData): Promise<AxiosResponse<Audit>> =>
     api.put(`/api/audits/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/audits/${id}`),
 };
 
@@ -881,9 +881,9 @@ export const auditRequestsApi = {
   list: (params?: { status?: string; auditId?: string; assigneeId?: string }) =>
     api.get('/api/audit-requests', { params }),
   get: (id: string) => api.get(`/api/audit-requests/${id}`),
-  create: (data: { auditId: string; title: string; description?: string; assigneeId?: string; dueDate?: string }) => 
+  create: (data: { auditId: string; title: string; description?: string; assigneeId?: string; dueDate?: string }) =>
     api.post('/api/audit-requests', data),
-  update: (id: string, data: { title?: string; description?: string; status?: string; assigneeId?: string; dueDate?: string }) => 
+  update: (id: string, data: { title?: string; description?: string; status?: string; assigneeId?: string; dueDate?: string }) =>
     api.put(`/api/audit-requests/${id}`, data),
   delete: (id: string) => api.delete(`/api/audit-requests/${id}`),
 };
@@ -891,14 +891,14 @@ export const auditRequestsApi = {
 export const auditFindingsApi = {
   list: (params?: FindingListParams): Promise<AxiosResponse<AuditFinding[]>> =>
     api.get('/api/findings', { params }),
-  get: (id: string): Promise<AxiosResponse<AuditFinding>> => 
+  get: (id: string): Promise<AxiosResponse<AuditFinding>> =>
     api.get(`/api/findings/${id}`),
   getStats: () => api.get('/api/findings/stats'),
-  create: (data: CreateFindingData | Record<string, unknown>): Promise<AxiosResponse<AuditFinding>> => 
+  create: (data: CreateFindingData | Record<string, unknown>): Promise<AxiosResponse<AuditFinding>> =>
     api.post('/api/findings', data),
-  update: (id: string, data: UpdateFindingData): Promise<AxiosResponse<AuditFinding>> => 
+  update: (id: string, data: UpdateFindingData): Promise<AxiosResponse<AuditFinding>> =>
     api.patch(`/api/findings/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/findings/${id}`),
   bulkUpdateStatus: (ids: string[], status: string) =>
     api.post('/api/findings/bulk/status', { ids, status }),
@@ -1021,15 +1021,15 @@ interface VendorListResponse {
 }
 
 export const vendorsApi = {
-  list: (params?: VendorListParams): Promise<AxiosResponse<VendorListResponse>> => 
+  list: (params?: VendorListParams): Promise<AxiosResponse<VendorListResponse>> =>
     api.get('/api/vendors', { params }),
-  get: (id: string): Promise<AxiosResponse<Vendor>> => 
+  get: (id: string): Promise<AxiosResponse<Vendor>> =>
     api.get(`/api/vendors/${id}`),
-  create: (data: CreateVendorData): Promise<AxiosResponse<Vendor>> => 
+  create: (data: CreateVendorData): Promise<AxiosResponse<Vendor>> =>
     api.post('/api/vendors', data),
-  update: (id: string, data: UpdateVendorData): Promise<AxiosResponse<Vendor>> => 
+  update: (id: string, data: UpdateVendorData): Promise<AxiosResponse<Vendor>> =>
     api.put(`/api/vendors/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/vendors/${id}`),
   // Review scheduling endpoints
   getReviewsDue: (): Promise<AxiosResponse<VendorReviewsDueResponse>> =>
@@ -1116,15 +1116,15 @@ export interface ControlGap {
 }
 
 export const contractsApi = {
-  list: (): Promise<AxiosResponse<Contract[]>> => 
+  list: (): Promise<AxiosResponse<Contract[]>> =>
     api.get('/api/contracts'),
-  get: (id: string): Promise<AxiosResponse<Contract>> => 
+  get: (id: string): Promise<AxiosResponse<Contract>> =>
     api.get(`/api/contracts/${id}`),
-  create: (data: CreateContractData): Promise<AxiosResponse<Contract>> => 
+  create: (data: CreateContractData): Promise<AxiosResponse<Contract>> =>
     api.post('/api/contracts', data),
-  update: (id: string, data: UpdateContractData): Promise<AxiosResponse<Contract>> => 
+  update: (id: string, data: UpdateContractData): Promise<AxiosResponse<Contract>> =>
     api.put(`/api/contracts/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/contracts/${id}`),
 };
 
@@ -1155,24 +1155,24 @@ export interface QuestionnaireDashboardQueue {
 }
 
 export const questionnairesApi = {
-  list: (params?: { status?: string; organizationId?: string }): Promise<AxiosResponse<Questionnaire[]>> => 
+  list: (params?: { status?: string; organizationId?: string }): Promise<AxiosResponse<Questionnaire[]>> =>
     api.get('/api/questionnaires', { params }),
-  get: (id: string): Promise<AxiosResponse<Questionnaire>> => 
+  get: (id: string): Promise<AxiosResponse<Questionnaire>> =>
     api.get(`/api/questionnaires/${id}`),
-  create: (data: CreateQuestionnaireData): Promise<AxiosResponse<Questionnaire>> => 
+  create: (data: CreateQuestionnaireData): Promise<AxiosResponse<Questionnaire>> =>
     api.post('/api/questionnaires', data),
-  update: (id: string, data: UpdateQuestionnaireData): Promise<AxiosResponse<Questionnaire>> => 
+  update: (id: string, data: UpdateQuestionnaireData): Promise<AxiosResponse<Questionnaire>> =>
     api.patch(`/api/questionnaires/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/questionnaires/${id}`),
   createQuestion: (data: CreateQuestionData) => api.post('/api/questionnaires/questions', data),
   updateQuestion: (id: string, data: UpdateQuestionData) => api.patch(`/api/questionnaires/questions/${id}`, data),
   deleteQuestion: (id: string) => api.delete(`/api/questionnaires/questions/${id}`),
   getStats: (organizationId: string) => api.get('/api/questionnaires/stats', { params: { organizationId } }),
-  getDashboardQueue: (organizationId: string): Promise<AxiosResponse<QuestionnaireDashboardQueue>> => 
+  getDashboardQueue: (organizationId: string): Promise<AxiosResponse<QuestionnaireDashboardQueue>> =>
     api.get('/api/questionnaires/dashboard-queue', { params: { organizationId } }),
   getMyQueue: (organizationId: string) => api.get('/api/questionnaires/my-queue', { params: { organizationId } }),
-  getAnalytics: (organizationId: string, startDate?: string, endDate?: string) => 
+  getAnalytics: (organizationId: string, startDate?: string, endDate?: string) =>
     api.get('/api/questionnaires/analytics', { params: { organizationId, startDate, endDate } }),
   findSimilarQuestions: (organizationId: string, questionText: string, excludeId?: string) =>
     api.get('/api/questionnaires/similar-questions', { params: { organizationId, questionText, excludeId } }),
@@ -1181,45 +1181,45 @@ export const questionnairesApi = {
   findDuplicates: (questionnaireId: string) =>
     api.get(`/api/questionnaires/${questionnaireId}/duplicates`),
   exportQuestionnaire: (id: string, format: 'excel' | 'csv' | 'json' = 'excel') =>
-    api.get(`/api/questionnaires/${id}/export`, { 
+    api.get(`/api/questionnaires/${id}/export`, {
       params: { format },
-      responseType: 'blob' 
+      responseType: 'blob'
     }),
   exportBatch: (ids: string[], format: 'excel' | 'json' = 'excel') =>
     api.post('/api/questionnaires/export-batch', { ids, format }, { responseType: 'blob' }),
 };
 
 export const knowledgeBaseApi = {
-  list: (params?: KnowledgeBaseListParams): Promise<AxiosResponse<KnowledgeBaseEntry[]>> => 
+  list: (params?: KnowledgeBaseListParams): Promise<AxiosResponse<KnowledgeBaseEntry[]>> =>
     api.get('/api/knowledge-base', { params }),
-  get: (id: string): Promise<AxiosResponse<KnowledgeBaseEntry>> => 
+  get: (id: string): Promise<AxiosResponse<KnowledgeBaseEntry>> =>
     api.get(`/api/knowledge-base/${id}`),
-  create: (data: CreateKnowledgeBaseData): Promise<AxiosResponse<KnowledgeBaseEntry>> => 
+  create: (data: CreateKnowledgeBaseData): Promise<AxiosResponse<KnowledgeBaseEntry>> =>
     api.post('/api/knowledge-base', data),
-  update: (id: string, data: UpdateKnowledgeBaseData): Promise<AxiosResponse<KnowledgeBaseEntry>> => 
+  update: (id: string, data: UpdateKnowledgeBaseData): Promise<AxiosResponse<KnowledgeBaseEntry>> =>
     api.patch(`/api/knowledge-base/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/knowledge-base/${id}`),
   bulkCreate: (data: { entries: CreateKnowledgeBaseData[] }) => api.post('/api/knowledge-base/bulk', data),
   approve: (id: string) => api.post(`/api/knowledge-base/${id}/approve`),
   incrementUsage: (id: string) => api.post(`/api/knowledge-base/${id}/use`),
-  search: (organizationId: string, query: string): Promise<AxiosResponse<KnowledgeBaseEntry[]>> => 
+  search: (organizationId: string, query: string): Promise<AxiosResponse<KnowledgeBaseEntry[]>> =>
     api.get('/api/knowledge-base/search', { params: { organizationId, q: query } }),
   getStats: (organizationId: string) => api.get('/api/knowledge-base/stats', { params: { organizationId } }),
 };
 
 export const trustCenterApi = {
-  getConfig: (params?: { organizationId?: string }): Promise<AxiosResponse<TrustCenterConfig>> => 
+  getConfig: (params?: { organizationId?: string }): Promise<AxiosResponse<TrustCenterConfig>> =>
     api.get('/api/trust-center/config', { params }),
   updateConfig: (data: UpdateTrustCenterConfigData, params?: { organizationId?: string }): Promise<AxiosResponse<TrustCenterConfig>> =>
     api.patch('/api/trust-center/config', data, { params }),
-  getContent: (params?: { organizationId?: string; section?: string }): Promise<AxiosResponse<TrustCenterContent[]>> => 
+  getContent: (params?: { organizationId?: string; section?: string }): Promise<AxiosResponse<TrustCenterContent[]>> =>
     api.get('/api/trust-center/content', { params }),
-  createContent: (data: CreateTrustCenterContentData): Promise<AxiosResponse<TrustCenterContent>> => 
+  createContent: (data: CreateTrustCenterContentData): Promise<AxiosResponse<TrustCenterContent>> =>
     api.post('/api/trust-center/content', data),
-  updateContent: (id: string, data: UpdateTrustCenterContentData): Promise<AxiosResponse<TrustCenterContent>> => 
+  updateContent: (id: string, data: UpdateTrustCenterContentData): Promise<AxiosResponse<TrustCenterContent>> =>
     api.patch(`/api/trust-center/content/${id}`, data),
-  deleteContent: (id: string): Promise<AxiosResponse<void>> => 
+  deleteContent: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/trust-center/content/${id}`),
   getPublic: (params?: { organizationId?: string }) => api.get('/api/trust-center/public', { params }),
 };
@@ -1262,11 +1262,11 @@ export interface TrustConfiguration {
 }
 
 export const trustConfigApi = {
-  get: (organizationId?: string): Promise<AxiosResponse<TrustConfiguration>> => 
+  get: (organizationId?: string): Promise<AxiosResponse<TrustConfiguration>> =>
     api.get('/api/trust-config', { params: { organizationId } }),
-  update: (data: Partial<TrustConfiguration>, organizationId?: string): Promise<AxiosResponse<TrustConfiguration>> => 
+  update: (data: Partial<TrustConfiguration>, organizationId?: string): Promise<AxiosResponse<TrustConfiguration>> =>
     api.put('/api/trust-config', data, { params: { organizationId } }),
-  reset: (organizationId?: string): Promise<AxiosResponse<TrustConfiguration>> => 
+  reset: (organizationId?: string): Promise<AxiosResponse<TrustConfiguration>> =>
     api.post('/api/trust-config/reset', {}, { params: { organizationId } }),
   getReference: () => api.get('/api/trust-config/reference'),
 };
@@ -1320,30 +1320,30 @@ export interface QuestionCategorization {
 }
 
 export const trustAiApi = {
-  draftAnswer: (organizationId: string, questionText: string): Promise<AxiosResponse<AnswerSuggestion>> => 
+  draftAnswer: (organizationId: string, questionText: string): Promise<AxiosResponse<AnswerSuggestion>> =>
     api.post('/api/trust-ai/draft-answer', { questionText }, { params: { organizationId } }),
-  categorizeQuestion: (organizationId: string, questionText: string): Promise<AxiosResponse<QuestionCategorization>> => 
+  categorizeQuestion: (organizationId: string, questionText: string): Promise<AxiosResponse<QuestionCategorization>> =>
     api.post('/api/trust-ai/categorize', { questionText }, { params: { organizationId } }),
-  improveAnswer: (organizationId: string, questionText: string, currentAnswer: string): Promise<AxiosResponse<AnswerSuggestion>> => 
+  improveAnswer: (organizationId: string, questionText: string, currentAnswer: string): Promise<AxiosResponse<AnswerSuggestion>> =>
     api.post('/api/trust-ai/improve-answer', { questionText, currentAnswer }, { params: { organizationId } }),
 };
 
 export const answerTemplatesApi = {
-  list: (params?: { organizationId?: string; category?: string; status?: string; search?: string }): Promise<AxiosResponse<AnswerTemplate[]>> => 
+  list: (params?: { organizationId?: string; category?: string; status?: string; search?: string }): Promise<AxiosResponse<AnswerTemplate[]>> =>
     api.get('/api/answer-templates', { params }),
-  get: (id: string): Promise<AxiosResponse<AnswerTemplate>> => 
+  get: (id: string): Promise<AxiosResponse<AnswerTemplate>> =>
     api.get(`/api/answer-templates/${id}`),
-  create: (data: CreateAnswerTemplateData): Promise<AxiosResponse<AnswerTemplate>> => 
+  create: (data: CreateAnswerTemplateData): Promise<AxiosResponse<AnswerTemplate>> =>
     api.post('/api/answer-templates', data),
-  update: (id: string, data: UpdateAnswerTemplateData): Promise<AxiosResponse<AnswerTemplate>> => 
+  update: (id: string, data: UpdateAnswerTemplateData): Promise<AxiosResponse<AnswerTemplate>> =>
     api.patch(`/api/answer-templates/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/answer-templates/${id}`),
-  archive: (id: string): Promise<AxiosResponse<AnswerTemplate>> => 
+  archive: (id: string): Promise<AxiosResponse<AnswerTemplate>> =>
     api.post(`/api/answer-templates/${id}/archive`),
-  unarchive: (id: string): Promise<AxiosResponse<AnswerTemplate>> => 
+  unarchive: (id: string): Promise<AxiosResponse<AnswerTemplate>> =>
     api.post(`/api/answer-templates/${id}/unarchive`),
-  apply: (id: string, variables: Record<string, string>): Promise<AxiosResponse<{ content: string; templateId: string; templateTitle: string }>> => 
+  apply: (id: string, variables: Record<string, string>): Promise<AxiosResponse<{ content: string; templateId: string; templateTitle: string }>> =>
     api.post(`/api/answer-templates/${id}/apply`, { variables }),
   getStats: (organizationId: string) => api.get('/api/answer-templates/stats', { params: { organizationId } }),
   getCategories: (organizationId: string) => api.get('/api/answer-templates/categories', { params: { organizationId } }),
@@ -1352,7 +1352,7 @@ export const answerTemplatesApi = {
 export const notificationsApi = {
   list: (params?: NotificationListParams) => api.get('/api/notifications', { params }),
   get: (id: string) => api.get(`/api/notifications/${id}`),
-  getUnreadCount: (): Promise<AxiosResponse<{ count: number }>> => 
+  getUnreadCount: (): Promise<AxiosResponse<{ count: number }>> =>
     api.get('/api/notifications/unread-count'),
   getStats: () => api.get('/api/notifications/stats'),
   markAsRead: (notificationIds?: string[], markAll?: boolean) =>
@@ -1360,7 +1360,7 @@ export const notificationsApi = {
   markOneAsRead: (id: string) => api.post(`/api/notifications/${id}/read`),
   delete: (id: string) => api.delete(`/api/notifications/${id}`),
   deleteAll: () => api.delete('/api/notifications'),
-  getPreferences: (): Promise<AxiosResponse<NotificationPreference[]>> => 
+  getPreferences: (): Promise<AxiosResponse<NotificationPreference[]>> =>
     api.get('/api/notifications/preferences/list'),
   updatePreferences: (preferences: NotificationPreference[]) =>
     api.put('/api/notifications/preferences', { preferences }),
@@ -1375,24 +1375,24 @@ interface RiskListResponse {
 }
 
 export const risksApi = {
-  list: (params?: RiskListParams): Promise<AxiosResponse<RiskListResponse>> => 
+  list: (params?: RiskListParams): Promise<AxiosResponse<RiskListResponse>> =>
     api.get('/api/risks', { params }),
-  get: (id: string): Promise<AxiosResponse<RiskDetail>> => 
+  get: (id: string): Promise<AxiosResponse<RiskDetail>> =>
     api.get(`/api/risks/${id}`),
-  create: (data: CreateRiskData): Promise<AxiosResponse<Risk>> => 
+  create: (data: CreateRiskData): Promise<AxiosResponse<Risk>> =>
     api.post('/api/risks', data),
-  update: (id: string, data: UpdateRiskData): Promise<AxiosResponse<Risk>> => 
+  update: (id: string, data: UpdateRiskData): Promise<AxiosResponse<Risk>> =>
     api.put(`/api/risks/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/risks/${id}`),
   markReviewed: (id: string, notes?: string) =>
     api.post(`/api/risks/${id}/review`, { notes }),
-  updateTreatment: (id: string, data: RiskTreatmentData) => 
+  updateTreatment: (id: string, data: RiskTreatmentData) =>
     api.put(`/api/risks/${id}/treatment`, data),
   getDashboard: () => api.get('/api/risks/dashboard'),
   getHeatmap: () => api.get('/api/risks/heatmap'),
   getTrend: (days?: number) => api.get('/api/risks/trend', { params: { days } }),
-  
+
   // Risk Workflow Methods
   validateRisk: (id: string, data: { approved: boolean; reason?: string; riskAssessorId?: string }) =>
     api.post(`/api/risks/${id}/validate`, data),
@@ -1412,7 +1412,7 @@ export const risksApi = {
     api.post(`/api/risks/${id}/executive-approval`, data),
   updateMitigationStatus: (id: string, data: Record<string, unknown>) =>
     api.post(`/api/risks/${id}/mitigation-status`, data),
-  
+
   // Link/Unlink methods
   linkControl: (id: string, data: { controlId: string; effectiveness?: string }) =>
     api.post(`/api/risks/${id}/controls`, data),
@@ -1422,7 +1422,7 @@ export const risksApi = {
     api.post(`/api/risks/${id}/assets`, { assetIds }),
   unlinkAsset: (id: string, assetId: string) =>
     api.delete(`/api/risks/${id}/assets/${assetId}`),
-  
+
   // Scenario methods
   createScenario: (id: string, data: Record<string, unknown>) =>
     api.post(`/api/risks/${id}/scenarios`, data),
@@ -1432,27 +1432,27 @@ export const risksApi = {
 
 // Risk Scenarios API (standalone scenario library)
 export const riskScenariosApi = {
-  list: (params?: RiskScenarioListParams): Promise<AxiosResponse<RiskScenario[]>> => 
+  list: (params?: RiskScenarioListParams): Promise<AxiosResponse<RiskScenario[]>> =>
     api.get('/api/risk-scenarios', { params }),
-  get: (id: string): Promise<AxiosResponse<RiskScenario>> => 
+  get: (id: string): Promise<AxiosResponse<RiskScenario>> =>
     api.get(`/api/risk-scenarios/${id}`),
-  create: (data: CreateRiskScenarioData): Promise<AxiosResponse<RiskScenario>> => 
+  create: (data: CreateRiskScenarioData): Promise<AxiosResponse<RiskScenario>> =>
     api.post('/api/risk-scenarios', data),
-  update: (id: string, data: UpdateRiskScenarioData): Promise<AxiosResponse<RiskScenario>> => 
+  update: (id: string, data: UpdateRiskScenarioData): Promise<AxiosResponse<RiskScenario>> =>
     api.put(`/api/risk-scenarios/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/risk-scenarios/${id}`),
-  clone: (id: string, newTitle?: string): Promise<AxiosResponse<RiskScenario>> => 
+  clone: (id: string, newTitle?: string): Promise<AxiosResponse<RiskScenario>> =>
     api.post(`/api/risk-scenarios/${id}/clone`, { newTitle }),
   simulate: (id: string, params: { controlEffectiveness?: number; mitigations?: string[] }) =>
     api.post(`/api/risk-scenarios/${id}/simulate`, params),
-  getTemplates: (): Promise<AxiosResponse<RiskScenario[]>> => 
+  getTemplates: (): Promise<AxiosResponse<RiskScenario[]>> =>
     api.get('/api/risk-scenarios/templates'),
-  getLibrary: (): Promise<AxiosResponse<RiskScenario[]>> => 
+  getLibrary: (): Promise<AxiosResponse<RiskScenario[]>> =>
     api.get('/api/risk-scenarios/library'),
-  getLibraryByCategory: (): Promise<AxiosResponse<{ category: string; templates: RiskScenario[] }[]>> => 
+  getLibraryByCategory: (): Promise<AxiosResponse<{ category: string; templates: RiskScenario[] }[]>> =>
     api.get('/api/risk-scenarios/library/by-category'),
-  getCategories: (): Promise<AxiosResponse<string[]>> => 
+  getCategories: (): Promise<AxiosResponse<string[]>> =>
     api.get('/api/risk-scenarios/categories'),
   getStatistics: () => api.get('/api/risk-scenarios/statistics'),
   bulkCreateFromTemplates: (templateIds: string[]) =>
@@ -1498,11 +1498,11 @@ Object.assign(risksApi, {
   startAssessment: (id: string, riskAssessorId: string) =>
     api.post(`/api/risks/${id}/start-assessment`, { riskAssessorId }),
   // Risk Assessment
-  submitAssessment: (id: string, data: RiskAssessmentData) => 
+  submitAssessment: (id: string, data: RiskAssessmentData) =>
     api.post(`/api/risks/${id}/assessment/submit`, data),
   reviewAssessment: (id: string, data: { approved: boolean; notes?: string; declinedReason?: string }) =>
     api.post(`/api/risks/${id}/assessment/review`, data),
-  completeRevision: (id: string, data: Partial<RiskAssessmentData>) => 
+  completeRevision: (id: string, data: Partial<RiskAssessmentData>) =>
     api.post(`/api/risks/${id}/assessment/revision`, data),
   // Risk Treatment
   submitTreatmentDecision: (id: string, data: {
@@ -1540,20 +1540,20 @@ interface AssetListResponse {
 }
 
 export const assetsApi = {
-  list: (params?: AssetListParams): Promise<AxiosResponse<AssetListResponse>> => 
+  list: (params?: AssetListParams): Promise<AxiosResponse<AssetListResponse>> =>
     api.get('/api/assets', { params }),
-  get: (id: string): Promise<AxiosResponse<Asset>> => 
+  get: (id: string): Promise<AxiosResponse<Asset>> =>
     api.get(`/api/assets/${id}`),
-  create: (data: CreateAssetData): Promise<AxiosResponse<Asset>> => 
+  create: (data: CreateAssetData): Promise<AxiosResponse<Asset>> =>
     api.post('/api/assets', data),
-  update: (id: string, data: UpdateAssetData): Promise<AxiosResponse<Asset>> => 
+  update: (id: string, data: UpdateAssetData): Promise<AxiosResponse<Asset>> =>
     api.put(`/api/assets/${id}`, data),
-  delete: (id: string): Promise<AxiosResponse<void>> => 
+  delete: (id: string): Promise<AxiosResponse<void>> =>
     api.delete(`/api/assets/${id}`),
   getStats: () => api.get('/api/assets/stats'),
-  getSources: (): Promise<AxiosResponse<string[]>> => 
+  getSources: (): Promise<AxiosResponse<string[]>> =>
     api.get('/api/assets/sources'),
-  getDepartments: (): Promise<AxiosResponse<string[]>> => 
+  getDepartments: (): Promise<AxiosResponse<string[]>> =>
     api.get('/api/assets/departments'),
   syncFromSource: (source: string, integrationId: string) =>
     api.post(`/api/assets/sync/${source}`, { integrationId }),
@@ -1851,13 +1851,13 @@ export const trainingApi = {
     slideProgress?: number;
     timeSpent?: number;
   }) => api.put(`/api/training/progress/${moduleId}`, data),
-  completeModule: (moduleId: string, score?: number) => 
+  completeModule: (moduleId: string, score?: number) =>
     api.post('/api/training/progress/complete', { moduleId, score }),
   getStats: () => api.get('/api/training/stats'),
   getOrgStats: () => api.get('/api/training/stats/org'),
 
   // Assignments
-  getAssignments: (userId?: string) => 
+  getAssignments: (userId?: string) =>
     api.get('/api/training/assignments', { params: userId ? { userId } : undefined }),
   getMyAssignments: () => api.get('/api/training/assignments/me'),
   createAssignment: (data: {
@@ -2038,12 +2038,12 @@ export interface ComplianceGapResponse {
 
 export const aiApi = {
   // Configuration
-  getConfig: (): Promise<AxiosResponse<AIConfig>> => 
+  getConfig: (): Promise<AxiosResponse<AIConfig>> =>
     api.get('/api/ai/config'),
-  updateConfig: (data: Partial<AIConfig>) => 
+  updateConfig: (data: Partial<AIConfig>) =>
     api.put('/api/ai/config', data),
-  getStatus: (): Promise<AxiosResponse<{ 
-    available: boolean; 
+  getStatus: (): Promise<AxiosResponse<{
+    available: boolean;
     config: AIConfig;
     isMockMode?: boolean;
     mockModeReason?: string;
@@ -2140,40 +2140,40 @@ export const mcpApi = {
   // Server Management
   getServers: (): Promise<AxiosResponse<{ success: boolean; data: MCPServer[] }>> =>
     api.get('/api/mcp/servers'),
-  
+
   getServer: (id: string): Promise<AxiosResponse<{ success: boolean; data: MCPServer }>> =>
     api.get(`/api/mcp/servers/${id}`),
-  
+
   connectServer: (id: string): Promise<AxiosResponse<{ success: boolean; data: MCPServer }>> =>
     api.post(`/api/mcp/servers/${id}/connect`),
-  
+
   disconnectServer: (id: string): Promise<AxiosResponse<{ success: boolean; data: MCPServer }>> =>
     api.post(`/api/mcp/servers/${id}/disconnect`),
-  
+
   deleteServer: (id: string): Promise<AxiosResponse<{ success: boolean }>> =>
     api.delete(`/api/mcp/servers/${id}`),
-  
+
   healthCheck: (id: string): Promise<AxiosResponse<{ success: boolean; data: { isHealthy: boolean; latencyMs?: number } }>> =>
     api.get(`/api/mcp/servers/${id}/health`),
 
   // Templates
   getTemplates: (): Promise<AxiosResponse<{ success: boolean; data: MCPServerTemplate[] }>> =>
     api.get('/api/mcp/templates'),
-  
+
   deployTemplate: (templateId: string, env: Record<string, string>): Promise<AxiosResponse<{ success: boolean; data: MCPServer }>> =>
     api.post(`/api/mcp/templates/${templateId}/deploy`, { env }),
 
   // Capabilities
   getCapabilities: (serverId: string): Promise<AxiosResponse<{ success: boolean; data: MCPServer['capabilities'] }>> =>
     api.get(`/api/mcp/servers/${serverId}/capabilities`),
-  
+
   refreshCapabilities: (serverId: string): Promise<AxiosResponse<{ success: boolean; data: MCPServer['capabilities'] }>> =>
     api.post(`/api/mcp/servers/${serverId}/capabilities/refresh`),
 
   // Tool Execution
   callTool: (serverId: string, toolName: string, args?: Record<string, unknown>): Promise<AxiosResponse<{ success: boolean; data: { result: unknown } }>> =>
     api.post('/api/mcp/tools/call', { serverId, toolName, arguments: args }),
-  
+
   callToolsBatch: (calls: Array<{ serverId: string; toolName: string; arguments?: Record<string, unknown> }>, parallel?: boolean): Promise<AxiosResponse<{ success: boolean; data: { results: unknown[] } }>> =>
     api.post('/api/mcp/tools/batch', { calls, parallel }),
 
@@ -2188,20 +2188,20 @@ export const mcpApi = {
   // Workflows
   getWorkflows: (): Promise<AxiosResponse<{ success: boolean; data: MCPWorkflow[] }>> =>
     api.get('/api/mcp/workflows'),
-  
+
   getWorkflow: (id: string): Promise<AxiosResponse<{ success: boolean; data: MCPWorkflow }>> =>
     api.get(`/api/mcp/workflows/${id}`),
-  
+
   executeWorkflow: (workflowId: string, input?: Record<string, unknown>): Promise<AxiosResponse<{ success: boolean; data: MCPExecution }>> =>
     api.post(`/api/mcp/workflows/${workflowId}/execute`, { input }),
 
   // Executions
   getExecutions: (): Promise<AxiosResponse<{ success: boolean; data: MCPExecution[] }>> =>
     api.get('/api/mcp/workflows/executions'),
-  
+
   getExecution: (executionId: string): Promise<AxiosResponse<{ success: boolean; data: MCPExecution }>> =>
     api.get(`/api/mcp/workflows/executions/${executionId}`),
-  
+
   cancelExecution: (executionId: string): Promise<AxiosResponse<{ success: boolean }>> =>
     api.post(`/api/mcp/workflows/executions/${executionId}/cancel`),
 };

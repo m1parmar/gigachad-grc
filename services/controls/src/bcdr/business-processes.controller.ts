@@ -56,6 +56,42 @@ export class BusinessProcessesController {
     return this.processesService.getDependencyGraph(user.organizationId);
   }
 
+  @Get('new')
+  @ApiOperation({ summary: 'Get template for new business process' })
+  @ApiResponse({ status: 200, description: 'Template object for creating a new business process' })
+  async getNewTemplate(@CurrentUser() user: UserContext) {
+    // Return a template object with default values for creating a new process
+    return {
+      id: null,
+      process_id: null,
+      name: '',
+      description: '',
+      department: '',
+      criticality_tier: 'tier_3_important',
+      rto_hours: 24,
+      rpo_hours: 4,
+      mtpd_hours: 72,
+      is_active: true,
+      owner_id: null,
+      owner_name: null,
+      owner_email: null,
+      impact_description: '',
+      recovery_priority: 1,
+      minimum_staff_required: 1,
+      alternate_site_required: false,
+      manual_workaround_available: false,
+      workaround_description: '',
+      next_review_due: null,
+      last_reviewed_at: null,
+      created_at: null,
+      updated_at: null,
+      dependencies: [],
+      assets: [],
+      recovery_strategies: [],
+      bcdr_plans: [],
+    };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get business process details' })
   @ApiParam({ name: 'id', description: 'Business process ID' })

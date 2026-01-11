@@ -1,14 +1,20 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAuditDto } from './dto/create-audit.dto';
 import { UpdateAuditDto } from './dto/update-audit.dto';
 
 @Injectable()
 export class AuditsService {
+  private readonly logger = new Logger(AuditsService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async create(createAuditDto: CreateAuditDto, createdBy: string) {
-    const { organizationId } = createAuditDto;
+    // Ensure organizationId is provided
+    const organizationId = createAuditDto.organizationId;
+    if (!organizationId) {
+      throw new Error('organizationId is required');
+    }
 
     // Generate audit ID if not provided
     const auditCount = await this.prisma.audit.count({
@@ -24,16 +30,29 @@ export class AuditsService {
 
     return this.prisma.audit.create({
       data: {
-        ...createAuditDto,
+        organizationId: organizationId as string,
         auditId,
-        portalAccessCode,
-        createdBy,
+        auditType: createAuditDto.auditType,
+        name: createAuditDto.name,
+        description: createAuditDto.description || undefined,
+        framework: createAuditDto.framework || undefined,
+        scope: createAuditDto.scope || undefined,
+        isExternal: createAuditDto.isExternal || false,
+        auditFirm: createAuditDto.auditFirm || undefined,
+        externalLeadName: createAuditDto.externalLeadName || undefined,
+        externalLeadEmail: createAuditDto.externalLeadEmail || undefined,
+        objectives: createAuditDto.objectives || undefined,
+        methodology: createAuditDto.methodology || undefined,
+        leadAuditorId: createAuditDto.leadAuditorId || undefined,
         plannedStartDate: createAuditDto.plannedStartDate
           ? new Date(createAuditDto.plannedStartDate)
           : undefined,
         plannedEndDate: createAuditDto.plannedEndDate
           ? new Date(createAuditDto.plannedEndDate)
           : undefined,
+        portalAccessCode,
+        createdBy,
+        tags: createAuditDto.tags || [],
       },
       include: {
         requests: true,
@@ -49,32 +68,41 @@ export class AuditsService {
     auditType?: string;
     isExternal?: boolean;
   }) {
-    const where: any = { organizationId, deletedAt: null };
+    try {
+      if (!organizationId) {
+        return [];
+      }
 
-    if (filters?.status) {
-      where.status = filters.status;
-    }
-    if (filters?.auditType) {
-      where.auditType = filters.auditType;
-    }
-    if (filters?.isExternal !== undefined) {
-      where.isExternal = filters.isExternal;
-    }
+      const where: any = { organizationId, deletedAt: null };
 
-    return this.prisma.audit.findMany({
-      where,
-      include: {
-        _count: {
-          select: {
-            requests: true,
-            findings: true,
-            evidence: true,
-            testResults: true,
+      if (filters?.status) {
+        where.status = filters.status;
+      }
+      if (filters?.auditType) {
+        where.auditType = filters.auditType;
+      }
+      if (filters?.isExternal !== undefined) {
+        where.isExternal = filters.isExternal;
+      }
+
+      return this.prisma.audit.findMany({
+        where,
+        include: {
+          _count: {
+            select: {
+              requests: true,
+              findings: true,
+              evidence: true,
+              testResults: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (error) {
+      this.logger.error(`Error fetching audits for organization ${organizationId}: ${error.message}`, error.stack);
+      return [];
+    }
   }
 
   async findOne(id: string, organizationId: string) {

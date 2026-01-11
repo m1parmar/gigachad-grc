@@ -49,6 +49,25 @@ export class CommunicationPlansController {
     return this.communicationService.getContactsByEscalation(user.organizationId, planId);
   }
 
+  @Get('new')
+  @ApiOperation({ summary: 'Get template for new communication plan' })
+  @ApiResponse({ status: 200, description: 'Template object for creating a new communication plan' })
+  async getNewTemplate(@CurrentUser() user: UserContext) {
+    return {
+      id: null,
+      name: '',
+      description: '',
+      plan_type: 'emergency',
+      bcdr_plan_id: null,
+      bcdr_plan_title: null,
+      activation_triggers: null,
+      is_active: true,
+      created_at: null,
+      updated_at: null,
+      contacts: [],
+    };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get communication plan details' })
   @ApiParam({ name: 'id', description: 'Plan ID' })

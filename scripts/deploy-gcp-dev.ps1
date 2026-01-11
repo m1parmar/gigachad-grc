@@ -485,12 +485,20 @@ $tempScript = [System.IO.Path]::GetTempFileName() + ".sh"
 if ($UseLocalTransfer) {
     Write-Step "Transferring local repository to instance..."
     
-    $localRepoPath = "$PSScriptRoot\..\Cursor\gigachad-grc"
-    if (-not (Test-Path $localRepoPath)) {
-        Write-Error-Msg "Local repository not found at: $localRepoPath"
-        Write-Info "Please ensure the repository exists at: Cursor\gigachad-grc"
-        Write-Info "Or use -RepoUrl parameter with a Git repository URL instead"
-        exit 1
+    # When running from scripts/ folder, the repo is at parent directory
+    $localRepoPath = "$PSScriptRoot\.."
+    # Resolve to absolute path
+    $localRepoPath = (Get-Item $localRepoPath).FullName
+    
+    if (-not (Test-Path "$localRepoPath\docker-compose.yml")) {
+        # Fallback: try the old path (for backwards compatibility)
+        $localRepoPath = "$PSScriptRoot\..\Cursor\gigachad-grc"
+        if (-not (Test-Path $localRepoPath)) {
+            Write-Error-Msg "Local repository not found. Expected docker-compose.yml at: $localRepoPath"
+            Write-Info "Please run this script from the scripts/ folder inside the repository"
+            Write-Info "Or use -RepoUrl parameter with a Git repository URL instead"
+            exit 1
+        }
     }
     
     Write-Info "Creating archive of repository..."

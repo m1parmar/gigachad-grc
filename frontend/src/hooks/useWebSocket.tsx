@@ -44,10 +44,10 @@ const WS_RECONNECT_CONFIG = {
 
 export function RealTimeProvider({ children, wsUrl }: RealTimeProviderProps) {
   const queryClient = useQueryClient();
-  
+
   // Get WebSocket URL from environment or prop
   const url = wsUrl || import.meta.env.VITE_WS_URL || 'ws://localhost:3001/ws';
-  
+
   const [status, setStatus] = useState<WebSocketStatus>('disconnected');
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -60,13 +60,13 @@ export function RealTimeProvider({ children, wsUrl }: RealTimeProviderProps) {
   const getReconnectDelay = useCallback(() => {
     const { minDelay, maxDelay, multiplier, jitter } = WS_RECONNECT_CONFIG;
     const attempt = reconnectAttemptRef.current;
-    
+
     // Calculate base delay with exponential backoff
     const baseDelay = Math.min(minDelay * Math.pow(multiplier, attempt), maxDelay);
-    
+
     // Add random jitter to prevent thundering herd
     const jitterAmount = baseDelay * jitter * (Math.random() * 2 - 1);
-    
+
     return Math.floor(baseDelay + jitterAmount);
   }, []);
 
@@ -129,19 +129,19 @@ export function RealTimeProvider({ children, wsUrl }: RealTimeProviderProps) {
         queryClient.invalidateQueries({ queryKey: [entityType + 's'] }); // Plural for list queries
         break;
       }
-      
+
       case 'notification': {
         const { body } = message.payload as { title: string; body: string };
         toast(body, { icon: '🔔' });
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
         break;
       }
-      
+
       case 'sync.complete':
         toast.success('Sync completed');
         queryClient.invalidateQueries();
         break;
-      
+
       default:
         // Unknown message type - log for debugging
         console.debug('Unknown WebSocket message type:', message.type);
@@ -203,18 +203,18 @@ export function RealTimeProvider({ children, wsUrl }: RealTimeProviderProps) {
  */
 export function useRealTime(): RealTimeContextValue {
   const context = useContext(RealTimeContext);
-  
+
   // Return safe defaults if provider is not available
   // This prevents crashes when the component is used outside the provider
   if (!context) {
     return {
       status: 'disconnected',
-      send: () => {},
-      subscribeToEntity: () => {},
-      unsubscribeFromEntity: () => {},
+      send: () => { },
+      subscribeToEntity: () => { },
+      unsubscribeFromEntity: () => { },
     };
   }
-  
+
   return context;
 }
 

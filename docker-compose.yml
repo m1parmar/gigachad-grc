@@ -179,8 +179,63 @@ services:
       - grc-network
     labels:
       - "traefik.enable=true"
+      # Core controls routes
       - "traefik.http.routers.controls.rule=PathPrefix(`/api/controls`)"
       - "traefik.http.routers.controls-evidence.rule=PathPrefix(`/api/evidence`)"
+      - "traefik.http.routers.controls-risks.rule=PathPrefix(`/api/risks`)"
+      - "traefik.http.routers.controls-frameworks-catalog.rule=PathPrefix(`/api/frameworks/catalog`)"
+      - "traefik.http.routers.controls-frameworks-catalog.priority=10"
+      # BCDR routes
+      - "traefik.http.routers.controls-bcdr.rule=PathPrefix(`/api/bcdr`)"
+      # Dashboard routes
+      - "traefik.http.routers.controls-dashboard.rule=PathPrefix(`/api/dashboard`)"
+      - "traefik.http.routers.controls-dashboards.rule=PathPrefix(`/api/dashboards`)"
+      # User/Permission routes
+      - "traefik.http.routers.controls-permissions.rule=PathPrefix(`/api/permissions`)"
+      - "traefik.http.routers.controls-users.rule=PathPrefix(`/api/users`)"
+      # MCP/AI routes
+      - "traefik.http.routers.controls-mcp.rule=PathPrefix(`/api/mcp`)"
+      - "traefik.http.routers.controls-ai.rule=PathPrefix(`/api/ai`)"
+      # Asset routes
+      - "traefik.http.routers.controls-assets.rule=PathPrefix(`/api/assets`)"
+      - "traefik.http.routers.controls-risk-config.rule=PathPrefix(`/api/risk-config`)"
+      - "traefik.http.routers.controls-risk-scenarios.rule=PathPrefix(`/api/risk-scenarios`)"
+      # Notification routes
+      - "traefik.http.routers.controls-notifications.rule=PathPrefix(`/api/notifications`)"
+      - "traefik.http.routers.controls-notifications-config.rule=PathPrefix(`/api/notifications-config`)"
+      # Integration routes
+      - "traefik.http.routers.controls-integrations.rule=PathPrefix(`/api/integrations`)"
+      # Task/workflow routes
+      - "traefik.http.routers.controls-tasks.rule=PathPrefix(`/api/tasks`)"
+      - "traefik.http.routers.controls-workflows.rule=PathPrefix(`/api/workflows`)"
+      - "traefik.http.routers.controls-webhooks.rule=PathPrefix(`/api/webhooks`)"
+      # Reports/Exports routes
+      - "traefik.http.routers.controls-reports.rule=PathPrefix(`/api/reports`)"
+      - "traefik.http.routers.controls-exports.rule=PathPrefix(`/api/exports`)"
+      # Config/Admin routes
+      - "traefik.http.routers.controls-config-as-code.rule=PathPrefix(`/api/config-as-code`)"
+      - "traefik.http.routers.controls-admin-jobs.rule=PathPrefix(`/api/admin`)"
+      - "traefik.http.routers.controls-seed.rule=PathPrefix(`/api/seed`)"
+      - "traefik.http.routers.controls-system.rule=PathPrefix(`/api/system`)"
+      - "traefik.http.routers.controls-modules.rule=PathPrefix(`/api/modules`)"
+      # Other entity routes
+      - "traefik.http.routers.controls-implementations.rule=PathPrefix(`/api/implementations`)"
+      - "traefik.http.routers.controls-comments.rule=PathPrefix(`/api/comments`)"
+      - "traefik.http.routers.controls-custom-fields.rule=PathPrefix(`/api/custom-fields`)"
+      - "traefik.http.routers.controls-delegations.rule=PathPrefix(`/api/delegations`)"
+      - "traefik.http.routers.controls-departments.rule=PathPrefix(`/api/departments`)"
+      - "traefik.http.routers.controls-permission-groups.rule=PathPrefix(`/api/permission-groups`)"
+      - "traefik.http.routers.controls-employee-compliance.rule=PathPrefix(`/api/employee-compliance`)"
+      - "traefik.http.routers.controls-retention.rule=PathPrefix(`/api/retention-policies`)"
+      - "traefik.http.routers.controls-sessions.rule=PathPrefix(`/api/sessions`)"
+      - "traefik.http.routers.controls-search.rule=PathPrefix(`/api/search`)"
+      - "traefik.http.routers.controls-bulk.rule=PathPrefix(`/api/bulk`)"
+      - "traefik.http.routers.controls-workspaces.rule=PathPrefix(`/api/workspaces`)"
+      - "traefik.http.routers.controls-training.rule=PathPrefix(`/api/training`)"
+      - "traefik.http.routers.controls-phishing.rule=PathPrefix(`/api/phishing`)"
+      # SCIM provisioning
+      - "traefik.http.routers.controls-scim.rule=PathPrefix(`/scim`)"
+      # Load balancer port
       - "traefik.http.services.controls.loadbalancer.server.port=3001"
     restart: unless-stopped
 
@@ -225,7 +280,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.frameworks.rule=PathPrefix(`/api/frameworks`)"
-      - "traefik.http.routers.frameworks-risks.rule=PathPrefix(`/api/risks`)"
+
       - "traefik.http.services.frameworks.loadbalancer.server.port=3002"
     restart: unless-stopped
 

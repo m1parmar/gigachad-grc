@@ -7,7 +7,7 @@ import { DevAuthGuard } from '../auth/dev-auth.guard';
 @ApiTags('Remediation Plans')
 @ApiBearerAuth()
 @UseGuards(DevAuthGuard)
-@Controller('remediation')
+@Controller('api/audit/remediation')
 export class RemediationController {
   constructor(private readonly remediationService: RemediationService) {}
 

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
@@ -7,6 +7,8 @@ import { calculateNextReviewDate } from '../vendors/vendors.service';
 
 @Injectable()
 export class AssessmentsService {
+  private readonly logger = new Logger(AssessmentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -57,35 +59,40 @@ export class AssessmentsService {
     assessmentType?: string;
     status?: string;
   }) {
-    const where: any = {};
+    try {
+      const where: any = {};
 
-    if (filters?.vendorId) {
-      where.vendorId = filters.vendorId;
-    }
+      if (filters?.vendorId) {
+        where.vendorId = filters.vendorId;
+      }
 
-    if (filters?.assessmentType) {
-      where.assessmentType = filters.assessmentType;
-    }
+      if (filters?.assessmentType) {
+        where.assessmentType = filters.assessmentType;
+      }
 
-    if (filters?.status) {
-      where.status = filters.status;
-    }
+      if (filters?.status) {
+        where.status = filters.status;
+      }
 
-    return this.prisma.vendorAssessment.findMany({
-      where,
-      include: {
-        vendor: {
-          select: {
-            id: true,
-            name: true,
-            tier: true,
+      return this.prisma.vendorAssessment.findMany({
+        where,
+        include: {
+          vendor: {
+            select: {
+              id: true,
+              name: true,
+              tier: true,
+            },
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Error fetching assessments: ${error.message}`, error.stack);
+      return [];
+    }
   }
 
   async findOne(id: string) {

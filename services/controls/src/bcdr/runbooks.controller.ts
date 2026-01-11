@@ -47,6 +47,36 @@ export class RunbooksController {
     return this.runbooksService.getStats(user.organizationId);
   }
 
+  @Get('new')
+  @ApiOperation({ summary: 'Get template for new runbook' })
+  @ApiResponse({ status: 200, description: 'Template object for creating a new runbook' })
+  async getNewTemplate(@CurrentUser() user: UserContext) {
+    return {
+      id: null,
+      runbook_id: null,
+      title: '',
+      description: '',
+      status: 'draft',
+      category: null,
+      system_name: null,
+      process_id: null,
+      process_name: null,
+      recovery_strategy_id: null,
+      strategy_name: null,
+      content: null,
+      version: '1.0',
+      owner_id: null,
+      owner_name: null,
+      estimated_duration_minutes: null,
+      required_access_level: null,
+      prerequisites: null,
+      tags: [],
+      created_at: null,
+      updated_at: null,
+      steps: [],
+    };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get runbook details' })
   @ApiParam({ name: 'id', description: 'Runbook ID' })

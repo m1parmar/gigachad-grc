@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAuditRequestDto } from './dto/create-request.dto';
 import { UpdateAuditRequestDto } from './dto/update-request.dto';
 
 @Injectable()
 export class RequestsService {
+  private readonly logger = new Logger(RequestsService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async create(createRequestDto: CreateAuditRequestDto, createdBy: string) {
@@ -36,41 +38,51 @@ export class RequestsService {
     assignedTo?: string;
     category?: string;
   }) {
-    const where: any = { organizationId, deletedAt: null };
+    try {
+      if (!organizationId) {
+        this.logger.warn('findAll called without organizationId');
+        return [];
+      }
 
-    if (filters?.auditId) {
-      where.auditId = filters.auditId;
-    }
-    if (filters?.status) {
-      where.status = filters.status;
-    }
-    if (filters?.assignedTo) {
-      where.assignedTo = filters.assignedTo;
-    }
-    if (filters?.category) {
-      where.category = filters.category;
-    }
+      const where: any = { organizationId, deletedAt: null };
 
-    return this.prisma.auditRequest.findMany({
-      where,
-      include: {
-        audit: {
-          select: {
-            id: true,
-            auditId: true,
-            name: true,
-            status: true,
+      if (filters?.auditId) {
+        where.auditId = filters.auditId;
+      }
+      if (filters?.status) {
+        where.status = filters.status;
+      }
+      if (filters?.assignedTo) {
+        where.assignedTo = filters.assignedTo;
+      }
+      if (filters?.category) {
+        where.category = filters.category;
+      }
+
+      return await this.prisma.auditRequest.findMany({
+        where,
+        include: {
+          audit: {
+            select: {
+              id: true,
+              auditId: true,
+              name: true,
+              status: true,
+            },
+          },
+          _count: {
+            select: {
+              evidence: true,
+              comments: true,
+            },
           },
         },
-        _count: {
-          select: {
-            evidence: true,
-            comments: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (error) {
+      this.logger.error(`Failed to find audit requests for organization ${organizationId}: ${error.message}`, error instanceof Error ? error.stack : undefined);
+      return [];
+    }
   }
 
   async findOne(id: string, organizationId: string) {

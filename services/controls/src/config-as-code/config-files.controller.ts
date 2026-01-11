@@ -176,7 +176,7 @@ export class ConfigFilesController {
     );
   }
 
-  @Get('*')
+  @Get(':filepath')
   @ApiOperation({ summary: 'Get a specific config file' })
   @ApiParam({ name: 'path', description: 'File path (e.g., controls/main.tf)' })
   @ApiResponse({
@@ -189,12 +189,12 @@ export class ConfigFilesController {
   @RequirePermission(Resource.SETTINGS, Action.READ)
   async getFile(
     @Request() req: any,
-    @Param('path') path: string,
+    @Param('filepath') filepath: string,
     @Query('workspaceId') workspaceId?: string,
   ): Promise<ConfigFileResponseDto> {
     return this.configFilesService.getFile(
       req.user.organizationId,
-      path,
+      filepath,
       workspaceId,
     );
   }
@@ -220,7 +220,7 @@ export class ConfigFilesController {
     );
   }
 
-  @Put('*')
+  @Put(':filepath')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update an existing config file' })
   @ApiParam({ name: 'path', description: 'File path' })
@@ -234,20 +234,20 @@ export class ConfigFilesController {
   @RequirePermission(Resource.SETTINGS, Action.UPDATE)
   async updateFile(
     @Request() req: any,
-    @Param('path') path: string,
+    @Param('filepath') filepath: string,
     @Body() dto: UpdateConfigFileDto,
     @Query('workspaceId') workspaceId?: string,
   ): Promise<ConfigFileResponseDto> {
     return this.configFilesService.updateFile(
       req.user.organizationId,
       req.user.userId,
-      path,
+      filepath,
       dto,
       workspaceId,
     );
   }
 
-  @Delete('*')
+  @Delete(':filepath')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a config file' })
   @ApiParam({ name: 'path', description: 'File path' })
@@ -257,13 +257,13 @@ export class ConfigFilesController {
   @RequirePermission(Resource.SETTINGS, Action.UPDATE)
   async deleteFile(
     @Request() req: any,
-    @Param('path') path: string,
+    @Param('filepath') filepath: string,
     @Query('workspaceId') workspaceId?: string,
   ): Promise<void> {
     return this.configFilesService.deleteFile(
       req.user.organizationId,
       req.user.userId,
-      path,
+      filepath,
       workspaceId,
     );
   }
@@ -313,7 +313,7 @@ export class ConfigFilesController {
     );
   }
 
-  @Get('*/versions')
+  @Get(':filepath/versions')
   @ApiOperation({ summary: 'Get version history for a file' })
   @ApiParam({ name: 'path', description: 'File path' })
   @ApiResponse({
@@ -325,12 +325,12 @@ export class ConfigFilesController {
   @RequirePermission(Resource.SETTINGS, Action.READ)
   async getVersionHistory(
     @Request() req: any,
-    @Param('path') path: string,
+    @Param('filepath') filepath: string,
     @Query('workspaceId') workspaceId?: string,
   ): Promise<ConfigFileVersionDto[]> {
     return this.configFilesService.getVersionHistory(
       req.user.organizationId,
-      path,
+      filepath,
       workspaceId,
     );
   }

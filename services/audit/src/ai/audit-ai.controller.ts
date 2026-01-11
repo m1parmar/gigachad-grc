@@ -18,7 +18,7 @@ import {
 @ApiTags('Audit AI')
 @ApiBearerAuth()
 @UseGuards(DevAuthGuard)
-@Controller('audit-ai')
+@Controller('api/audit-ai')
 export class AuditAIController {
   constructor(private readonly auditAIService: AuditAIService) {}
 
