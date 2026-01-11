@@ -143,7 +143,7 @@ export const API_URL = import.meta.env.VITE_API_URL || '';
 // Dedicated controls service URL for module configuration and other org-wide settings.
 // Falls back to API_URL for environments that front a single gateway.
 const CONTROLS_API_URL =
-  import.meta.env.VITE_CONTROLS_API_URL || API_URL || 'http://localhost:3001';
+  import.meta.env.VITE_CONTROLS_API_URL || API_URL;
 
 /**
  * Retry configuration for API requests

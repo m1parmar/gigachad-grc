@@ -23,13 +23,15 @@ import {
 } from './dto/permission.dto';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { DevAuthGuard } from '../auth/dev-auth.guard';
 
 @Controller('api/permissions')
+@UseGuards(DevAuthGuard)
 export class PermissionsController {
   constructor(
     private readonly groupsService: GroupsService,
     private readonly permissionsService: PermissionsService,
-  ) {}
+  ) { }
 
   // ===========================
   // Permission Groups
