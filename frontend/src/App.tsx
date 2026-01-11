@@ -54,6 +54,7 @@ const TrustCenterSettings = lazy(() => import('./pages/TrustCenterSettings'));
 const Audits = lazy(() => import('./pages/Audits'));
 const AuditDetail = lazy(() => import('./pages/AuditDetail'));
 const AuditRequests = lazy(() => import('./pages/AuditRequests'));
+const AuditRequestDetail = lazy(() => import('./pages/AuditRequestDetail'));
 const AuditFindings = lazy(() => import('./pages/AuditFindings'));
 const AuditTemplates = lazy(() => import('./pages/AuditTemplates'));
 const AuditWorkpapers = lazy(() => import('./pages/AuditWorkpapers'));
@@ -249,6 +250,8 @@ export default function App() {
           <Route path="audits" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><Audits /></Suspense></ModuleRoute>} />
           <Route path="audits/:id" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><AuditDetail /></Suspense></ModuleRoute>} />
           <Route path="audit-requests" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><AuditRequests /></Suspense></ModuleRoute>} />
+          <Route path="audit-requests/new" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><AuditRequestDetail /></Suspense></ModuleRoute>} />
+          <Route path="audit-requests/:id" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><AuditRequestDetail /></Suspense></ModuleRoute>} />
           <Route path="audit-findings" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><AuditFindings /></Suspense></ModuleRoute>} />
           <Route path="audit-templates" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><AuditTemplates /></Suspense></ModuleRoute>} />
           <Route path="audit-workpapers" element={<ModuleRoute module="audit"><Suspense fallback={<PageLoader />}><AuditWorkpapers /></Suspense></ModuleRoute>} />
